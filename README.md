@@ -2,6 +2,12 @@
 
 An independent test suite for celld's Cloudflare Workers and Durable Objects compatibility, storage recovery, and multi-node behavior.
 
+## Latest results
+
+**[View the live test matrix →](https://ewhauser.github.io/celld-tck/)**
+
+Updated by CI on `main`, including failing runs. Browse case results, known bugs, divergences, and evidence. [View CI runs](https://github.com/ewhauser/celld-tck/actions/workflows/ci.yml?query=branch%3Amain).
+
 ## Why
 
 celld doesn't ship with tests, by the author's preference. This project fills that gap with an open-source suite that anyone can run against a celld release.
