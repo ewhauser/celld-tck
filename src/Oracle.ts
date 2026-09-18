@@ -40,76 +40,73 @@ export const evaluate = (
         candidateValue = yield* test
           .run(candidate, input)
           .pipe(Effect.timeout("30 seconds"));
+        // Both non-conformance paths (documented divergence and known bug) share
+        // the same shape: guard the scope, prove the candidate still fails the
+        // compatibility oracle, then assert the expectation-specific evidence.
+        const expectNonConformance = (expectation: {
+          readonly phase: string;
+          readonly guard: boolean;
+          readonly guardMessage: string;
+          readonly unexpectedPassMessage: string;
+          readonly finalCheck: Effect.Effect<void, TckError>;
+        }) =>
+          Effect.gen(function* () {
+            if (!expectation.guard)
+              return yield* Effect.fail(
+                new TckError({
+                  phase: expectation.phase,
+                  message: expectation.guardMessage,
+                }),
+              );
+            const conforms = yield* Effect.exit(
+              test
+                .check(candidateValue, input)
+                .pipe(
+                  Effect.andThen(test.compare(referenceValue, candidateValue)),
+                ),
+            );
+            if (Exit.isSuccess(conforms))
+              return yield* Effect.fail(
+                new TckError({
+                  phase: expectation.phase,
+                  message: expectation.unexpectedPassMessage,
+                }),
+              );
+            if (
+              Cause.hasInterrupts(conforms.cause) ||
+              Cause.hasDies(conforms.cause)
+            )
+              return yield* Effect.failCause(conforms.cause);
+            yield* expectation.finalCheck;
+          });
         if (test.divergence && candidate.engine === "celld") {
-          if (
-            candidate.version !== test.divergence.celldVersion ||
-            !matchesProfile(input, test.divergence)
-          )
-            return yield* Effect.fail(
-              new TckError({
-                phase: "divergence",
-                message:
-                  "Divergence requires review for this celld version/compatibility profile",
-              }),
-            );
-          const conforms = yield* Effect.exit(
-            test
-              .check(candidateValue, input)
-              .pipe(
-                Effect.andThen(test.compare(referenceValue, candidateValue)),
-              ),
-          );
-          if (Exit.isSuccess(conforms))
-            return yield* Effect.fail(
-              new TckError({
-                phase: "divergence",
-                message:
-                  "Unexpected compatibility pass; review the documented divergence",
-              }),
-            );
-          if (
-            Cause.hasInterrupts(conforms.cause) ||
-            Cause.hasDies(conforms.cause)
-          )
-            return yield* Effect.failCause(conforms.cause);
-          yield* test.divergence.check(candidateValue);
+          yield* expectNonConformance({
+            phase: "divergence",
+            guard:
+              candidate.version === test.divergence.celldVersion &&
+              matchesProfile(input, test.divergence),
+            guardMessage:
+              "Divergence requires review for this celld version/compatibility profile",
+            unexpectedPassMessage:
+              "Unexpected compatibility pass; review the documented divergence",
+            finalCheck: test.divergence.check(candidateValue),
+          });
           status = "divergence";
           return;
         }
         if (knownBug && candidate.engine === "celld" && knownBugs === "allow") {
-          if (
-            knownBug.caseId !== test.id ||
-            candidate.version !== knownBug.celldVersion ||
-            !matchesProfile(input, knownBug)
-          )
-            return yield* Effect.fail(
-              new TckError({
-                phase: "known-bugs",
-                message:
-                  "Known bug requires review for this case/version/compatibility profile",
-              }),
-            );
-          const conforms = yield* Effect.exit(
-            test
-              .check(candidateValue, input)
-              .pipe(
-                Effect.andThen(test.compare(referenceValue, candidateValue)),
-              ),
-          );
-          if (Exit.isSuccess(conforms))
-            return yield* Effect.fail(
-              new TckError({
-                phase: "known-bugs",
-                message:
-                  "Unexpected compatibility pass; retire the known-bug expectation",
-              }),
-            );
-          if (
-            Cause.hasInterrupts(conforms.cause) ||
-            Cause.hasDies(conforms.cause)
-          )
-            return yield* Effect.failCause(conforms.cause);
-          yield* equal(candidateValue, knownBug.candidate);
+          yield* expectNonConformance({
+            phase: "known-bugs",
+            guard:
+              knownBug.caseId === test.id &&
+              candidate.version === knownBug.celldVersion &&
+              matchesProfile(input, knownBug),
+            guardMessage:
+              "Known bug requires review for this case/version/compatibility profile",
+            unexpectedPassMessage:
+              "Unexpected compatibility pass; retire the known-bug expectation",
+            finalCheck: equal(candidateValue, knownBug.candidate),
+          });
           status = "known-bug";
           return;
         }

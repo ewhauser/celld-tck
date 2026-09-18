@@ -2,7 +2,7 @@ import { Effect, Exit, FileSystem, Schema, Schedule } from "effect";
 import { build } from "esbuild";
 import { resolve } from "node:path";
 import { fleetControls } from "./FleetControls.js";
-import { DiskContainer, DiskVolume, ownedStateVolume } from "./DiskLoss.js";
+import { DiskContainer } from "./DiskLoss.js";
 import { equal } from "./Oracle.js";
 import { checkDeployment } from "./DeploymentChecks.js";
 import { Artifacts, decodeJson } from "./Artifacts.js";
@@ -10,6 +10,7 @@ import { sha256 } from "./Build.js";
 import { TckError, type Bundle, type RuntimeHandle } from "./Domain.js";
 import { Processes } from "./Processes.js";
 import { cleanupAll, owned } from "./Resources.js";
+import { inspectService, mcCat, publishedPort, toolDeploy } from "./Compose.js";
 
 const Deployment = Schema.Struct({
   worker: Schema.String,
@@ -212,15 +213,9 @@ export const acquireLocal = (options: LocalOptions) =>
         const deploymentChecks = runId.endsWith("-core")
           ? yield* checkDeployment(bundle, compose)
           : [];
-        const deployed = yield* compose([
-          "run",
-          "--rm",
-          "-T",
-          "tool",
-          "deploy",
-          "/fixture",
-          "--json",
-        ]);
+        const deployed = yield* toolDeploy(compose, "/fixture", {
+          dryRun: false,
+        });
         yield* artifacts.text("deployment.json", deployed.stdout);
         const deployment = yield* decodeJson(Deployment, deployed.stdout);
         if (
@@ -236,16 +231,7 @@ export const acquireLocal = (options: LocalOptions) =>
           );
         }
         const key = `local/tck/deploy/${deployment.worker}/${deployment.version}/index.js`;
-        const uploaded = yield* compose([
-          "run",
-          "--rm",
-          "-T",
-          "--entrypoint",
-          "mc",
-          "storage",
-          "cat",
-          key,
-        ]);
+        const uploaded = yield* mcCat(compose, key);
         const uploadedHash = sha256(uploaded.stdout);
         if (uploadedHash !== bundle.sha256)
           return yield* Effect.fail(
@@ -294,18 +280,13 @@ export const acquireLocal = (options: LocalOptions) =>
               : ["celld2"]
             : []),
         ]);
-        const address = (yield* compose([
-          "port",
+        const address = yield* publishedPort(
+          compose,
           "celld",
           "8080",
-        ])).stdout.trim();
-        if (!/^127\.0\.0\.1:\d+$/.test(address))
-          return yield* Effect.fail(
-            new TckError({
-              phase: "setup",
-              message: `Unexpected public address: ${address}`,
-            }),
-          );
+          "setup",
+          (value) => `Unexpected public address: ${value}`,
+        );
         const ids = (yield* compose(["ps", "-q", "--all"])).stdout
           .trim()
           .split(/\s+/)
@@ -330,17 +311,8 @@ export const acquireLocal = (options: LocalOptions) =>
         let sequence = 0;
         const recordState = (label: string) =>
           Effect.gen(function* () {
-            const id = (yield* compose([
-              "ps",
-              "--all",
-              "-q",
-              "celld",
-            ])).stdout.trim();
-            const output = yield* processes.run("docker", ["inspect", id]);
-            yield* artifacts.text(
-              `lifecycle-${++sequence}-${label}.json`,
-              output.stdout,
-            );
+            const raw = yield* inspectService(compose, processes, "celld");
+            yield* artifacts.text(`lifecycle-${++sequence}-${label}.json`, raw);
             return yield* decodeJson(
               Schema.Array(
                 Schema.Struct({
@@ -350,7 +322,7 @@ export const acquireLocal = (options: LocalOptions) =>
                   }),
                 }),
               ),
-              output.stdout,
+              raw,
             );
           });
         return {
@@ -367,14 +339,7 @@ export const acquireLocal = (options: LocalOptions) =>
                     }),
                   );
                 yield* compose(["stop", "--timeout", "5", "minio"]);
-                const id = (yield* compose([
-                  "ps",
-                  "--all",
-                  "-q",
-                  "minio",
-                ])).stdout.trim();
-                const raw = (yield* processes.run("docker", ["inspect", id]))
-                  .stdout;
+                const raw = yield* inspectService(compose, processes, "minio");
                 yield* artifacts.text("outage-minio-stopped.json", raw);
                 const state = (yield* decodeJson(
                   Schema.Array(DiskContainer),
@@ -449,20 +414,17 @@ export const acquireLocal = (options: LocalOptions) =>
               }),
             discardDisk: () =>
               Effect.gen(function* () {
-                const inspectService = (service: string) =>
+                // MinIO is inspected around the delegated fleet discard so the
+                // storage container is proven untouched by the disk loss.
+                const minioState = () =>
                   Effect.gen(function* () {
-                    const id = (yield* compose([
-                      "ps",
-                      "--all",
-                      "-q",
-                      service,
-                    ])).stdout.trim();
-                    const raw = (yield* processes.run("docker", [
-                      "inspect",
-                      id,
-                    ])).stdout;
+                    const raw = yield* inspectService(
+                      compose,
+                      processes,
+                      "minio",
+                    );
                     yield* artifacts.text(
-                      `disk-loss-${++sequence}-${service}.json`,
+                      `disk-loss-${++sequence}-minio.json`,
                       raw,
                     );
                     const entries = yield* decodeJson(
@@ -478,70 +440,13 @@ export const acquireLocal = (options: LocalOptions) =>
                       );
                     return entries[0]!;
                   });
-                const previous = yield* inspectService("celld");
-                const minio = yield* inspectService("minio");
-                const raw = (yield* processes.run("docker", [
-                  "volume",
-                  "inspect",
-                  `${runId}_celld-state`,
-                ])).stdout;
-                yield* artifacts.text("disk-loss-old-volume.json", raw);
-                const volumes = yield* decodeJson(
-                  Schema.Array(DiskVolume),
-                  raw,
-                );
-                if (volumes.length !== 1)
-                  return yield* Effect.fail(
-                    new TckError({
-                      phase: "lifecycle",
-                      message: "Expected one state volume",
-                    }),
-                  );
-                const name = yield* ownedStateVolume(
-                  runId,
-                  previous,
-                  volumes[0]!,
-                );
-                const logs = yield* compose([
-                  "logs",
-                  "--no-color",
-                  "--timestamps",
-                  "celld",
-                ]);
-                yield* artifacts.text(
-                  "celld-before-disk-loss.log",
-                  logs.stdout + logs.stderr,
-                );
-                yield* compose(["rm", "--force", "celld"]);
-                yield* processes.run("docker", ["volume", "rm", name]);
-                yield* compose(["create", "celld"]);
-                const replacement = yield* inspectService("celld");
-                if (replacement.Id === previous.Id)
-                  return yield* Effect.fail(
-                    new TckError({
-                      phase: "lifecycle",
-                      message: "Container was not replaced",
-                    }),
-                  );
-                // Verify the recreated disk is empty before any celld process can use it.
-                yield* compose([
-                  "run",
-                  "--no-deps",
-                  "--rm",
-                  "-T",
-                  "--volume",
-                  `${name}:/empty:ro`,
-                  "--entrypoint",
-                  "/bin/sh",
-                  "storage",
-                  "-ec",
-                  'entries=$(ls -A /empty); test -z "$entries"',
-                ]);
-                yield* equal(yield* inspectService("minio"), minio);
+                const minio = yield* minioState();
+                const discarded = yield* fleet.discard("celld");
+                yield* equal(yield* minioState(), minio);
                 yield* artifacts.json("disk-loss.json", {
-                  removedVolume: name,
-                  oldContainer: previous.Id,
-                  newContainer: replacement.Id,
+                  removedVolume: discarded.volume,
+                  oldContainer: discarded.oldContainer,
+                  newContainer: discarded.newContainer,
                   emptyBeforeStart: true,
                   minioUnchanged: true,
                 });
@@ -587,18 +492,13 @@ export const acquireLocal = (options: LocalOptions) =>
                       message: "Container did not start",
                     }),
                   );
-                const endpoint = (yield* compose([
-                  "port",
+                const endpoint = yield* publishedPort(
+                  compose,
                   "celld",
                   "8080",
-                ])).stdout.trim();
-                if (!/^127\.0\.0\.1:\d+$/.test(endpoint))
-                  return yield* Effect.fail(
-                    new TckError({
-                      phase: "lifecycle",
-                      message: "Invalid restarted endpoint",
-                    }),
-                  );
+                  "lifecycle",
+                  "Invalid restarted endpoint",
+                );
                 return { ...target, baseUrl: `http://${endpoint}` };
               }),
           },
@@ -617,16 +517,7 @@ export const acquireLocal = (options: LocalOptions) =>
                   baseUrl: `http://${result.stdout.trim()}`,
                 })),
               ),
-            deploy: () =>
-              compose([
-                "run",
-                "--rm",
-                "-T",
-                "tool",
-                "deploy",
-                "/fixture",
-                "--json",
-              ]),
+            deploy: () => toolDeploy(compose, "/fixture", { dryRun: false }),
             evict: (node: string, cell: string) =>
               compose([
                 "exec",

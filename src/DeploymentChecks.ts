@@ -2,6 +2,7 @@ import { Clock, Effect, Exit, FileSystem, Schema } from "effect";
 import { resolve } from "node:path";
 import { Artifacts, decodeJson } from "./Artifacts.js";
 import { TckError, type Bundle, type CaseResult } from "./Domain.js";
+import { toolDeploy } from "./Compose.js";
 
 export const rejectionConfigs = [
   {
@@ -43,16 +44,7 @@ export const checkDeployment = (
     // Successful control proves an unavailable Docker daemon or broken CLI cannot
     // masquerade as an expected configuration rejection.
     const start = yield* Clock.currentTimeMillis;
-    const control = yield* compose([
-      "run",
-      "--rm",
-      "-T",
-      "tool",
-      "deploy",
-      "/fixture",
-      "--dry-run",
-      "--json",
-    ]);
+    const control = yield* toolDeploy(compose, "/fixture", { dryRun: true });
     yield* decodeJson(
       Schema.Struct({
         dry_run: Schema.Literal(true),
@@ -80,16 +72,7 @@ export const checkDeployment = (
         }),
       );
       const result = yield* Effect.exit(
-        compose([
-          "run",
-          "--rm",
-          "-T",
-          "tool",
-          "deploy",
-          `/fixture/${file}`,
-          "--dry-run",
-          "--json",
-        ]),
+        toolDeploy(compose, `/fixture/${file}`, { dryRun: true }),
       );
       // Failures carry structured stderr in the typed error; Cause.pretty includes it
       // only when rendered, so inspect the failure with Effect.catch below instead.
