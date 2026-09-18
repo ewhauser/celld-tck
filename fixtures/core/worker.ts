@@ -96,6 +96,7 @@ export class Probe extends DurableObject<Env> {
   }
   private handle(request: Request) {
     const storage = this.ctx.storage;
+    // oxlint-disable-next-line typescript/no-this-alias -- Capture the Durable Object for the generator below.
     const self = this;
     return Effect.gen(function* () {
       const url = new URL(request.url);
@@ -269,6 +270,7 @@ export class Probe extends DurableObject<Env> {
                 2,
                 "uncommitted",
               );
+              // oxlint-disable-next-line effect/throw-in-effect-gen -- The synchronous transaction must throw to roll back; operation captures the error.
               throw new Error("tck intentional rollback");
             }),
           ).pipe(

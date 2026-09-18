@@ -2,3 +2,4 @@ allowBuilds:
   esbuild: true
   workerd: true
   sharp: false
+  msgpackr-extract: false

@@ -1,5 +1,6 @@
 // Local fault-injection sidecar. The control listener is published only on loopback.
 import { Effect, Schema } from "effect";
+// oxlint-disable-next-line effect/use-http-client-service -- Fault injection needs direct control of Node sockets and response streams.
 import { createServer, request as upstreamRequest } from "node:http";
 const Control = Schema.Struct({
   mode: Schema.Literals([
@@ -22,6 +23,7 @@ export const acquireStorageProxy = (
   Effect.gen(function* () {
     const scope = yield* Effect.scope;
     const run = <A, E>(work: Effect.Effect<A, E>) =>
+      // oxlint-disable-next-line effect/effect-run-in-body -- Bridge Node HTTP callbacks into the owning scope.
       Effect.runFork(work.pipe(Effect.forkIn(scope)));
     let control: typeof Control.Type = { mode: "normal", durationMs: 0 };
     let until = 0;
@@ -158,6 +160,7 @@ export const acquireStorageProxy = (
     return { data, admin };
   });
 if (process.env.TCK_PROXY_CHILD === "1")
+  // oxlint-disable-next-line effect/effect-run-in-body -- Standalone sidecar entrypoint.
   Effect.runFork(
     Effect.scoped(acquireStorageProxy().pipe(Effect.andThen(Effect.never))),
   );

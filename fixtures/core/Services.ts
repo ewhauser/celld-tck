@@ -128,7 +128,9 @@ export const services = (request: Request, env: Env, name: string) =>
           env.KV.list({ prefix: name + "/", limit: 1 }),
         );
         if (first.list_complete)
-          throw new Error("First page unexpectedly complete");
+          return yield* Effect.fail(
+            new Error("First page unexpectedly complete"),
+          );
         const second = yield* platform(() =>
           env.KV.list({ prefix: name + "/", cursor: first.cursor, limit: 1 }),
         );
@@ -213,7 +215,8 @@ export const services = (request: Request, env: Env, name: string) =>
         );
         const head = yield* platform(() => env.BUCKET.head(key));
         const get = yield* platform(() => env.BUCKET.get(key));
-        if (!put || !head || !get) throw new Error("Missing R2 object");
+        if (!put || !head || !get)
+          return yield* Effect.fail(new Error("Missing R2 object"));
         const ranged = yield* platform(() =>
           env.BUCKET.get(key, { range: { offset: 1, length: 2 } }),
         );
@@ -241,7 +244,7 @@ export const services = (request: Request, env: Env, name: string) =>
       }
       case "/r2/conditional": {
         const put = yield* platform(() => env.BUCKET.put(name, "first"));
-        if (!put) throw new Error("Missing put result");
+        if (!put) return yield* Effect.fail(new Error("Missing put result"));
         const rejected = yield* platform(() =>
           env.BUCKET.put(name, "wrong", {
             onlyIf: { etagMatches: "does-not-match" },

@@ -12,7 +12,11 @@ pnpm test:reference
 pnpm test:local
 ```
 
-`pnpm check` runs formatting, type checks, and unit tests. Run the relevant recovery or fault suite when changing those areas.
+`pnpm check` runs Oxfmt formatting checks, Oxlint, type checks, and unit tests. Use `pnpm format` to format files and `pnpm lint:fix` to apply automatic lint fixes. Generated Worker declarations are excluded from formatting and linting. Run the relevant recovery or fault suite when changing those areas.
+
+Oxlint loads `@mpsuesser/oxlint-plugin-effect` with eight selected rules in `.oxlintrc.json`: typed generator failures, current service APIs, runtime execution boundaries, tagged domain errors, Effect filesystem/process/HTTP services, and scoped temporary files. We do not enable its full opinionated preset. These checks are syntax-based, not type-aware, and do not replace review of cancellation and resource ownership.
+
+Fixtures and tests may construct and inspect native errors to exercise runtime semantics. The listed Worker and callback adapters may run Effects at platform boundaries. Intentional synchronous rollback throws and the Node HTTP fault-injection proxy have local suppressions explaining why native behavior is required. Keep new exceptions equally narrow. The plugin's optional `msgpackr-extract` native build is disabled in `pnpm-workspace.yaml`; linting uses its JavaScript fallback.
 
 ## Adding cases
 

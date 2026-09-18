@@ -26,6 +26,7 @@ export const storageOperation = (storage: DurableObjectStorage, path: string) =>
             storage.transactionSync(() => {
               storage.kv.put("balance", 2);
               storage.sql.exec("INSERT INTO mixed VALUES (7)");
+              // oxlint-disable-next-line effect/throw-in-effect-gen -- Throw synchronously to exercise transaction rollback; operation captures the error.
               throw new Error("rollback");
             }),
           ),
