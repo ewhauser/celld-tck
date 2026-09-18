@@ -141,10 +141,7 @@ const memoryPressure = (
       }),
     );
     yield* Effect.sleep("11 seconds");
-    yield* Effect.forEach(nodes, ctx.start, {
-      concurrency: "unbounded",
-      discard: true,
-    });
+    yield* ctx.startAll();
     for (const node of constrained) {
       const restored = yield* fleet.resources(node);
       yield* artifacts.json(`${id}-${node}-restored-capacity.json`, restored);

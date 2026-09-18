@@ -24,9 +24,7 @@ const runTraffic = (
         const successor = nodes.find((node) => node !== prior.node)!;
         yield* fleet.pause(prior.node);
         yield* Effect.sleep("11 seconds");
-        yield* ctx
-          .write(successor)
-          .pipe(Effect.flatMap((ack) => equal(ack, true)));
+        yield* ctx.writeAcknowledged(successor);
         const after = yield* ctx.owner();
         yield* equal(
           after.node !== prior.node && after.epoch > prior.epoch,
