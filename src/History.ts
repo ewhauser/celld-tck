@@ -24,6 +24,54 @@ export const LedgerEvent = Schema.Struct({
   node: Schema.String,
 });
 export type LedgerEvent = typeof LedgerEvent.Type;
+export const readLedger = (
+  path: string,
+  options: { allowEmpty?: boolean } = {},
+) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const text = yield* fs.readFileString(path);
+    if (!text.endsWith("\n") && !(options.allowEmpty && text.length === 0))
+      return yield* Effect.fail(
+        new TckError({
+          phase: "ledger",
+          message: "Truncated ledger; preserve and inspect before resuming",
+        }),
+      );
+    return yield* Effect.forEach(text.split("\n").filter(Boolean), (line) =>
+      decodeJson(LedgerEvent, line),
+    );
+  });
+
+// Transport and decoding are shared; callers own semantic checks and evidence writes.
+export const readHistory = <E, R>(
+  json: (path: string) => Effect.Effect<unknown, E, R>,
+) =>
+  Effect.gen(function* () {
+    const rows: Array<typeof HistoryRow.Type> = [];
+    for (let page = 0; page < 100; page++) {
+      const next = yield* json(
+        `/history/state?after=${rows.at(-1)?.seq ?? 0}`,
+      ).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(Schema.Array(HistoryRow))),
+      );
+      rows.push(...next);
+      if (next.length < 128) return rows;
+    }
+    return yield* Effect.fail(
+      new TckError({
+        phase: "history",
+        message: "History exceeded 12800 rows",
+      }),
+    );
+  });
+export const readHistoryKv = <E, R>(
+  json: (path: string) => Effect.Effect<unknown, E, R>,
+) =>
+  json("/history/kv").pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(HistoryKv)),
+  );
+
 // A surviving JSONL file is the authority. Flush each entry before proceeding.
 export const makeLedger = (name: string) =>
   Effect.gen(function* () {
@@ -44,20 +92,9 @@ export const makeLedger = (name: string) =>
         ),
       );
     const read = () =>
-      Effect.gen(function* () {
-        const text = yield* fs.readFileString(path);
-        // A truncated final record is never silently interpreted as an acknowledgment.
-        if (text && !text.endsWith("\n"))
-          return yield* Effect.fail(
-            new TckError({
-              phase: "ledger",
-              message: "Truncated ledger; preserve and inspect before resuming",
-            }),
-          );
-        return yield* Effect.forEach(text.split("\n").filter(Boolean), (line) =>
-          decodeJson(LedgerEvent, line),
-        );
-      });
+      readLedger(path, { allowEmpty: true }).pipe(
+        Effect.provideService(FileSystem.FileSystem, fs),
+      );
     return { append, read, path };
   });
 export const checkHistory = (

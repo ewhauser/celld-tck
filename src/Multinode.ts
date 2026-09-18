@@ -1,4 +1,5 @@
-import { Effect, Schedule, Schema } from "effect";
+import { retryRead, pendingPhase, waitForReady } from "./Polling.js";
+import { Effect, Schema } from "effect";
 import { provenance } from "./Provenance.js";
 import { Artifacts } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
@@ -110,14 +111,14 @@ export const runMultinode = (options: {
       });
       Object.assign(environment, yield* provenance);
       const bundle = yield* buildFixtureFor("recovery");
-      const runtime = yield* acquireLocal(
-        `${options.runId}-multinode`,
+      const runtime = yield* acquireLocal({
+        runId: `${options.runId}-multinode`,
         bundle,
-        executor.cleanupError,
-        true,
+        cleanupError: executor.cleanupError,
+        topology: "cluster",
         durability,
         nodeCount,
-      );
+      });
       environment.candidate = runtime.metadata;
       environment.fixtureSha256 = bundle.sha256;
       const fleet = runtime.fleet;
@@ -143,16 +144,12 @@ export const runMultinode = (options: {
           method,
         });
       const ready = (node: Node) =>
-        transport
-          .request(targets[node], { path: "/.well-known/celld/health" })
-          .pipe(
-            Effect.flatMap((value) => equal(value.status, 200)),
-            Effect.retry({
-              schedule: Schedule.spaced("500 millis"),
-              times: 90,
-            }),
-            Effect.timeout("60 seconds"),
-          );
+        waitForReady(
+          transport.request(targets[node], {
+            path: "/.well-known/celld/health",
+          }),
+          { interval: "500 millis", attempts: 91, timeout: "60 seconds" },
+        ).pipe(Effect.asVoid);
       const read = (node: Node) =>
         request(node, "/outage/state").pipe(
           Effect.tap((value) => equal(value.status, 200)),
@@ -218,12 +215,13 @@ export const runMultinode = (options: {
           yield* fleet.kill(owner);
           yield* Effect.sleep("11 seconds");
           // Cold activation can take time; retry read transport/setup only, then assert data once.
-          yield* read(survivor).pipe(
-            Effect.retry({
-              schedule: Schedule.spaced("500 millis"),
-              times: 20,
+          yield* read(survivor).pipe((probe) =>
+            retryRead(probe, {
+              retryable: pendingPhase("http"),
+              interval: "500 millis",
+              attempts: 21,
+              timeout: "45 seconds",
             }),
-            Effect.timeout("45 seconds"),
           );
           yield* check(survivor);
           yield* checkHandoff(original, yield* fleet.owner(cell), survivor);
@@ -258,14 +256,13 @@ export const runMultinode = (options: {
                 }),
               );
             yield* equal(state.State.ExitCode, 3);
-          }).pipe(
-            Effect.retry({
-              while: (error) =>
-                error instanceof TckError && error.phase === "fence-pending",
-              schedule: Schedule.spaced("1 second"),
-              times: 30,
+          }).pipe((probe) =>
+            retryRead(probe, {
+              retryable: pendingPhase("fence-pending"),
+              interval: "1 second",
+              attempts: 31,
+              timeout: "40 seconds",
             }),
-            Effect.timeout("40 seconds"),
           );
           const logs = yield* fleet.logs(isolated);
           yield* artifacts.text("partition-node.log", logs);
@@ -288,12 +285,13 @@ export const runMultinode = (options: {
               refused.response.status >= 200 && refused.response.status < 300,
               false,
             );
-          yield* read(healthy).pipe(
-            Effect.retry({
-              schedule: Schedule.spaced("500 millis"),
-              times: 20,
+          yield* read(healthy).pipe((probe) =>
+            retryRead(probe, {
+              retryable: pendingPhase("http"),
+              interval: "500 millis",
+              attempts: 21,
+              timeout: "45 seconds",
             }),
-            Effect.timeout("45 seconds"),
           );
           yield* check(healthy);
           yield* checkHandoff(prior, yield* fleet.owner(cell), healthy);
@@ -354,12 +352,13 @@ export const runMultinode = (options: {
             );
             yield* fleet.kill(leader);
             yield* Effect.sleep("11 seconds");
-            yield* read(follower).pipe(
-              Effect.retry({
-                schedule: Schedule.spaced("500 millis"),
-                times: 20,
+            yield* read(follower).pipe((probe) =>
+              retryRead(probe, {
+                retryable: pendingPhase("http"),
+                interval: "500 millis",
+                attempts: 21,
+                timeout: "60 seconds",
               }),
-              Effect.timeout("60 seconds"),
             );
             yield* check(follower);
             yield* checkHandoff(prior, yield* fleet.owner(cell), follower);

@@ -1,4 +1,5 @@
-import { Effect, Schedule, Schema } from "effect";
+import { waitForReady, pollUntil } from "./Polling.js";
+import { Effect, Schema } from "effect";
 import { provenance } from "./Provenance.js";
 import { Artifacts } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
@@ -92,11 +93,12 @@ export const runRecovery = (options: {
       Object.assign(environment, yield* provenance);
       const bundle = yield* buildFixtureFor("recovery");
       environment.fixtureSha256 = bundle.sha256;
-      const runtime = yield* acquireLocal(
-        `${options.runId}-recovery`,
+      const runtime = yield* acquireLocal({
+        runId: `${options.runId}-recovery`,
         bundle,
-        executor.cleanupError,
-      );
+        cleanupError: executor.cleanupError,
+        topology: "single",
+      });
       environment.candidate = runtime.metadata;
       const lifecycle = runtime.lifecycle;
       let target: Target = runtime.target;
@@ -112,13 +114,11 @@ export const runRecovery = (options: {
             Effect.map((value) => value.body),
           );
       const ready = () =>
-        request("/ready", "readiness").pipe(
-          Effect.flatMap((value) => equal(value, { ready: true })),
-          Effect.retry({
-            schedule: Schedule.spaced("500 millis"),
-            times: 90,
-          }),
-          Effect.timeout("60 seconds"),
+        waitForReady(
+          transport.request(target, { path: "/ready?name=readiness" }),
+          { interval: "500 millis", attempts: 91, timeout: "60 seconds" },
+        ).pipe(
+          Effect.flatMap((response) => equal(response.body, { ready: true })),
         );
       yield* ready();
       for (const id of ids) {
@@ -176,25 +176,12 @@ export const runRecovery = (options: {
               target = yield* lifecycle.start();
               yield* ready();
               const recovered = alarm
-                ? yield* read().pipe(
-                    Effect.flatMap((value) =>
-                      value.fired
-                        ? Effect.succeed(value)
-                        : Effect.fail(
-                            new TckError({
-                              phase: "alarm-pending",
-                              message: "Waiting for overdue alarm",
-                            }),
-                          ),
-                    ),
-                    Effect.retry({
-                      while: (error) =>
-                        error instanceof TckError &&
-                        error.phase === "alarm-pending",
-                      schedule: Schedule.spaced("500 millis"),
-                      times: 60,
-                    }),
-                  )
+                ? yield* pollUntil(read(), (value) => value.fired, {
+                    interval: "500 millis",
+                    attempts: 61,
+                    timeout: "120 seconds",
+                    message: "Waiting for overdue alarm",
+                  })
                 : yield* read();
               yield* artifacts.json(`${id}-observations.json`, {
                 localDiskRetained: !diskLoss,

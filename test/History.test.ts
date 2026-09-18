@@ -2,7 +2,12 @@ import { NodeServices } from "@effect/platform-node";
 import { expect, it } from "@effect/vitest";
 import { Effect, FileSystem } from "effect";
 import { artifactsLayer } from "../src/Artifacts.js";
-import { checkHistory, makeLedger, type LedgerEvent } from "../src/History.js";
+import {
+  checkHistory,
+  readHistory,
+  makeLedger,
+  type LedgerEvent,
+} from "../src/History.js";
 const intent = (id: string, at: number): LedgerEvent => ({
   kind: "intent",
   id,
@@ -154,4 +159,44 @@ it.effect("observed uncertain writes cannot disappear or change sequence", () =>
       ))._tag,
     ).toBe("Failure");
   }),
+);
+
+it.effect(
+  "history reader follows cursors, rejects malformed pages and bounds endless pagination",
+  () =>
+    Effect.gen(function* () {
+      const paths: string[] = [];
+      const first = Array.from({ length: 128 }, (_, i) =>
+        row(String(i), i + 1),
+      );
+      const read = (path: string) =>
+        Effect.sync(() => {
+          paths.push(path);
+          return paths.length === 1 ? first : [row("last", 129)];
+        });
+      const rows = yield* readHistory(read);
+      expect(rows).toHaveLength(129);
+      expect(paths).toEqual([
+        "/history/state?after=0",
+        "/history/state?after=128",
+      ]);
+      let calls = 0;
+      const invalid = yield* readHistory(() =>
+        Effect.sync(() => {
+          calls++;
+          return [{ seq: "bad" }];
+        }),
+      ).pipe(Effect.exit);
+      expect(invalid._tag).toBe("Failure");
+      expect(calls).toBe(1);
+      calls = 0;
+      const endless = yield* readHistory(() =>
+        Effect.sync(() => {
+          calls++;
+          return first;
+        }),
+      ).pipe(Effect.exit);
+      expect(endless._tag).toBe("Failure");
+      expect(calls).toBe(100);
+    }),
 );

@@ -24,16 +24,33 @@ const Container = Schema.Struct({
   Config: Schema.Struct({ Image: Schema.String }),
 });
 
-export const acquireLocal = (
-  runId: string,
-  bundle: Bundle,
-  cleanupError: (detail: string) => Effect.Effect<void>,
-  multiNode = false,
-  durability: "bucket" | "fleet" = "bucket",
-  nodeCount: 2 | 3 = 2,
-  qualification = false,
-) =>
+export type LocalOptions = {
+  runId: string;
+  bundle: Bundle;
+  cleanupError: (detail: string) => Effect.Effect<void>;
+} & (
+  | { topology: "single"; durability?: "bucket"; qualification?: false }
+  | {
+      topology: "cluster";
+      nodeCount: 2 | 3;
+      durability: "bucket" | "fleet";
+      qualification?: false;
+    }
+  | {
+      topology: "cluster";
+      nodeCount: 3;
+      durability: "bucket" | "fleet";
+      qualification: true;
+    }
+);
+
+export const acquireLocal = (options: LocalOptions) =>
   Effect.gen(function* () {
+    const { runId, bundle, cleanupError } = options;
+    const multiNode = options.topology === "cluster";
+    const nodeCount = options.topology === "cluster" ? options.nodeCount : 2;
+    const durability = options.durability ?? "bucket";
+    const qualification = options.qualification ?? false;
     const processes = yield* Processes;
     const artifacts = yield* Artifacts;
     const fs = yield* FileSystem.FileSystem;

@@ -1,4 +1,5 @@
-import { Console, Effect, FileSystem, Schedule, Schema } from "effect";
+import { waitForReady } from "./Polling.js";
+import { Console, Effect, FileSystem, Schema } from "effect";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { Artifacts, artifactsLayer } from "./Artifacts.js";
@@ -47,18 +48,16 @@ export const selectCases = (caseId: string, suite: Suite = "all") =>
 const ready = (target: Target, runId: string) =>
   Effect.gen(function* () {
     const transport = yield* Transport;
-    const observation = yield* transport.request(target, {
-      path: `/ready?name=${runId}-readiness`,
-    });
+    const observation = yield* waitForReady(
+      transport.request(target, { path: `/ready?name=${runId}-readiness` }),
+      { interval: "250 millis", attempts: 31, timeout: "45 seconds" },
+    );
     yield* equal(observation, {
       status: 200,
       headers: { "content-type": "application/json" },
       body: { value: "ok" },
     });
-  }).pipe(
-    Effect.retry({ schedule: Schedule.spaced("250 millis"), times: 30 }),
-    Effect.timeout("45 seconds"),
-  );
+  });
 
 export const runSuite = (options: RunOptions) =>
   Effect.gen(function* () {
@@ -170,11 +169,12 @@ export const runSuite = (options: RunOptions) =>
               `Reference ready. Starting ${options.profile === "local" ? "celld + MinIO" : "second isolated workerd"}...`,
             );
             const candidate = yield* options.profile === "local"
-              ? acquireLocal(
-                  `${options.runId}-${fixture}`,
+              ? acquireLocal({
+                  runId: `${options.runId}-${fixture}`,
                   bundle,
-                  executor.cleanupError,
-                )
+                  cleanupError: executor.cleanupError,
+                  topology: "single",
+                })
               : acquireReference("candidate", bundle, executor.cleanupError);
             groupEnvironment.candidate = candidate.metadata;
             if (options.profile === "local" && fixture === "core") {

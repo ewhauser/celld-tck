@@ -1,3 +1,4 @@
+import { fleetFaults } from "./FleetFaults.js";
 import { Effect, Schema } from "effect";
 import { Artifacts, decodeJson } from "./Artifacts.js";
 import { Processes } from "./Processes.js";
@@ -76,7 +77,9 @@ export const fleetControls = (
         Effect.orDie,
       ),
     );
+    const faults = yield* fleetFaults(project, inspect);
     return {
+      ...faults,
       pause: (node: Node) =>
         Effect.gen(function* () {
           yield* equal((yield* inspect(node)).State.Running, true);

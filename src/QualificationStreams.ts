@@ -1,7 +1,7 @@
 import { Deferred, Effect, Exit, Fiber, Schema } from "effect";
 import { TckError } from "./Domain.js";
 import { equal } from "./Oracle.js";
-import type { QualificationContext } from "./Qualification.js";
+import type { QualificationContext } from "./QualificationContext.js";
 const platform = <A>(f: (signal: AbortSignal) => PromiseLike<A>) =>
   Effect.tryPromise({
     try: (signal) => Promise.resolve(f(signal)),

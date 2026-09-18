@@ -1,11 +1,7 @@
-import { Effect, Schema, Schedule } from "effect";
+import { waitForReady } from "./Polling.js";
+import { Effect, Schema } from "effect";
 import { Artifacts } from "./Artifacts.js";
-import {
-  Transport,
-  TckError,
-  type RuntimeHandle,
-  type Target,
-} from "./Domain.js";
+import { Transport, type RuntimeHandle, type Target } from "./Domain.js";
 import { equal } from "./Oracle.js";
 
 export const OutageState = Schema.Struct({
@@ -91,15 +87,11 @@ export const runOutage = (
         ),
       );
     const ready = () =>
-      transport.request(target, { path: "/ready?name=outage-readiness" }).pipe(
-        Effect.flatMap((value) =>
-          equal(
-            { status: value.status, body: value.body },
-            { status: 200, body: { ready: true } },
-          ),
-        ),
-        Effect.retry({ schedule: Schedule.spaced("500 millis"), times: 90 }),
-        Effect.timeout("60 seconds"),
+      waitForReady(
+        transport.request(target, { path: "/ready?name=outage-readiness" }),
+        { interval: "500 millis", attempts: 91, timeout: "60 seconds" },
+      ).pipe(
+        Effect.flatMap((response) => equal(response.body, { ready: true })),
       );
     yield* equal((yield* write(1)).acknowledged, true);
     const before = yield* read();

@@ -1,4 +1,5 @@
-import { Effect, Exit, Fiber, Schedule, Schema } from "effect";
+import { retryRead, pendingPhase } from "./Polling.js";
+import { Effect, Exit, Fiber, Schema } from "effect";
 import { Artifacts } from "./Artifacts.js";
 import { TckError, type Observation } from "./Domain.js";
 import { type Node, type fleetControls } from "./FleetControls.js";
@@ -62,12 +63,14 @@ export const resilienceStages = (ctx: ResilienceContext) =>
     const others = (node: Node) => nodes.filter((peer) => peer !== node);
     const checkAll = () => Effect.forEach(nodes, ctx.check, { discard: true });
     const readable = (node: Node) =>
-      ctx
-        .read(node)
-        .pipe(
-          Effect.retry({ schedule: Schedule.spaced("500 millis"), times: 30 }),
-          Effect.timeout("60 seconds"),
-        );
+      ctx.read(node).pipe((probe) =>
+        retryRead(probe, {
+          retryable: pendingPhase("http"),
+          interval: "500 millis",
+          attempts: 31,
+          timeout: "60 seconds",
+        }),
+      );
     const fenced = (node: Node) =>
       Effect.gen(function* () {
         const current = yield* fleet.inspect(node);
@@ -79,14 +82,13 @@ export const resilienceStages = (ctx: ResilienceContext) =>
             }),
           );
         yield* equal(current.State.ExitCode, 3);
-      }).pipe(
-        Effect.retry({
-          while: (error) =>
-            error instanceof TckError && error.phase === "fence-pending",
-          schedule: Schedule.spaced("500 millis"),
-          times: 40,
+      }).pipe((probe) =>
+        retryRead(probe, {
+          retryable: pendingPhase("fence-pending"),
+          interval: "500 millis",
+          attempts: 41,
+          timeout: "30 seconds",
         }),
-        Effect.timeout("30 seconds"),
       );
     const ensemble = (
       node: Node,
@@ -110,14 +112,13 @@ export const resilienceStages = (ctx: ResilienceContext) =>
           );
         yield* checkEnsemble(node, [node, ...peers], lease.log.ensemble);
         return lease;
-      }).pipe(
-        Effect.retry({
-          while: (error) =>
-            error instanceof TckError && error.phase === "ensemble-pending",
-          schedule: Schedule.spaced("1 second"),
-          times: 30,
+      }).pipe((probe) =>
+        retryRead(probe, {
+          retryable: pendingPhase("ensemble-pending"),
+          interval: "1 second",
+          attempts: 31,
+          timeout: "45 seconds",
         }),
-        Effect.timeout("45 seconds"),
       );
     // A healthy one-follower ensemble does not expand in v0.5.0. Start a fresh
     // owner generation after both peers are ready to establish this scenario's precondition.
@@ -210,12 +211,13 @@ export const resilienceStages = (ctx: ResilienceContext) =>
                       }),
                     ),
               ),
-              Effect.retry({
-                while: (error) => error.phase === "write-pending",
-                schedule: Schedule.spaced("50 millis"),
-                times: 30,
-              }),
-              Effect.timeout("3 seconds"),
+              (probe) =>
+                retryRead(probe, {
+                  retryable: pendingPhase("write-pending"),
+                  interval: "50 millis",
+                  attempts: 31,
+                  timeout: "3 seconds",
+                }),
             );
             yield* artifacts.text("interrupted-write-entry.log", entered);
             yield* fleet.kill(prior.node);
