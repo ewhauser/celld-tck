@@ -22,7 +22,7 @@ Each run saves fixture hashes, deployment metadata, raw HTTP and commands, befor
 
 Use `--case recovery.disk-loss` with `--suite recovery` for a focused run. The suite has an eight-minute deadline and restart scenarios have two-minute deadlines and the outage scenario has a three-minute deadline. Readiness and alarm completion each have separate bounds. A kill is restricted to the run-owned celld service; Only the outage case stops and restarts the run-owned MinIO service; unrelated Docker projects are never targeted.
 
-Future local extensions: network partitions with live object-store processes and multi-node fencing/failover. These need distinct fault controls and oracles; the current tests do not imply coverage of them.
+Live-store network faults, multi-node fencing/failover, and additional lifecycle scenarios now run in the separate multinode, fleet, resilience, and qualification suites. They use distinct fault controls and oracles; this single-node suite does not imply their coverage.
 
 ## Object-store outage
 

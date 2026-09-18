@@ -1,0 +1,57 @@
+# Full local qualification
+
+This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 19 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, and `test:capacity` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
+
+All authored TypeScript uses Effect v4 RC.115. New runtime fixtures use the same compatibility date as the API corpus. Fault scenarios assert lifecycle invariants against real celld; they are not labeled as differential workerd tests.
+
+## Traffic and ownership
+
+- `traffic.crash-ledger`: four concurrent clients, three seeded crash schedules, 96 attempted operations per round, acknowledged baseline and final writes, and exact recovered histories through all three nodes.
+- `traffic.paused-owner`: pause the observed owner past its lease, write on a successor, verify a higher ownership epoch, then resume the old owner while concurrent clients send writes to all endpoints. Require fencing and preserve every acknowledged operation in a single valid order.
+- `traffic.restart-races`: restart and kill the owner again before the normal lease wait while traffic continues; repeat with three seeded delays, then verify recovered histories.
+
+The external driver writes an intent before sending each unique operation and an acknowledgment only after validating the full HTTP receipt. It appends JSONL through a serialized writer and calls filesystem sync for every entry. Verification reopens this file, rather than trusting an in-memory acknowledgment list. Requests with missing or unsuccessful responses remain uncertain: their transaction may be absent or wholly present, never partial. SQL sequence numbers define a total order, and the oracle checks real-time precedence for non-overlapping completed operations using the driver's clock. Payloads must match both SQL and KV. A separate complete KV scan must exactly match the SQL history, rejecting orphaned KV writes as well as missing or corrupt values. This checks append histories; it is not a general-purpose linearizability checker for arbitrary application operations.
+
+For a driver crash that leaves the dedicated test fleet alive, resume the read-only audit:
+
+```sh
+pnpm tck --suite audit --ledger /absolute/path/to/history.jsonl \
+  --endpoint http://127.0.0.1:PORT --name RECORDED_OBJECT_NAME
+```
+
+Use the name, ledger, and current endpoint from the run evidence. This command does not redeploy or write to the application. An intent without a terminal record remains uncertain; malformed/truncated ledger records fail rather than being discarded. A response received just before a driver crash may have only an intent in the durable ledger. Handled interruptions normally clean the owned fleet; audit cannot resurrect resources that were already removed.
+
+## Application dependencies
+
+- `dependencies.queue-acceptance`: acknowledge a delayed batch, stop all nodes before delivery, remain down past the delay, restart together, and require every accepted message.
+- `dependencies.queue-redelivery`: observe first delivery and an explicit delayed retry, crash the fleet during the delay, and require redelivery. At-least-once duplicates are permitted; missing messages are not.
+- `dependencies.workflow-recovery`: persist a completed step, stop while waiting for an event, recover, deliver the event, and require both steps' effects and returned results exactly once in this schedule.
+- `dependencies.stream-reconnect`: retain a client cursor, interrupt an active ordered stream with owner failure, reconnect from that cursor, and require the exact full sequence and payloads without gaps or duplicates.
+- `dependencies.hibernation`: keep one WebSocket connected, explicitly evict its owning DO through celld's internal lifecycle endpoint, and require a changed activation token plus continued attachment state on the same socket.
+
+Named service RPC is covered by the API corpus and checked again after each node rolls to a new fixture revision. Application streams here are a persisted ordered append feed; adapt that contract if your application uses different cursor or acknowledgment semantics. Hibernation means an eviction with a surviving connection, not a process restart.
+
+## Storage and lifecycle faults
+
+- `faults.storage-latency`: delay storage forwarding by 750 ms during active writes.
+- `faults.storage-throttle`: return S3 `SlowDown`/503 responses during active writes.
+- `faults.storage-timeout`: withhold responses beyond the driver's request deadline and span the lease window.
+- `faults.storage-ambiguous`: forward writes to MinIO, observe an upstream successful response, then destroy the downstream connection. Require proof that a successful PUT response for this exact object's LTX data was dropped after completion.
+- `faults.peer-partition`: disconnect the owner's peer network while retaining its storage network, prove the advertised peer endpoint is unreachable, apply traffic, restore connectivity, and verify every acknowledgment. Docker's public-port mapping is restored by restarting the reconnected node after checking history through a peer.
+- `faults.rolling-deployment`: deploy a second application revision with the same storage schema, gracefully restart nodes one at a time under traffic, require new named-service RPC results, and preserve the complete history. This tests application rolling deployment on the pinned celld binary, not cross-version celld binary upgrades.
+
+Storage cases use bucket durability so a follower cannot bypass the injected storage fault. MinIO stays alive. Each storage case requires fault evidence on the exact test object's LTX data path. The bounded proxy records its mode and upstream status; the lost-response mode also records actual downstream destruction after upstream completion. Modes automatically expire and scoped finalizers clear them. Diagnosis and deployment use this same normal proxy path before faults are enabled. Existing suites retain their direct-MinIO path. Peer aliases exist only on the peer network, preventing silent routing around that network through storage-network DNS.
+
+## Capacity and performance
+
+- `capacity.large-restore`: write 16 MiB of deterministic pseudorandom payloads, destroy the owner's local disk, and verify every byte after restoration; record the post-restart restore/read verification request duration, excluding process startup and lease wait.
+- `capacity.memory-pressure`: impose verified 128 MiB container limits and request 96 MiB allocations; require either a verified allocation or a node termination under the verified limit; record overload responses, exit codes, and Docker OOM flags, restore 512 MiB per-node capacity, then require acknowledged data to recover.
+- `capacity.slow-consumer`: four clients each consume an 8 MiB padded, 128-record stream slowly with bounded buffers and exact ordering/payload checks.
+- `capacity.queue-load`: submit five 100-message batches while consumers run; require all 500 IDs and record drain duration and delivery counts.
+- `capacity.insufficient-spare`: restrict the two replacement nodes to 8 MiB, verify they cannot remain running (Docker OOM flags are retained separately from exit code 137), remove the remaining node, attempt traffic, then restore capacity and require every acknowledgment to survive. Unavailability is allowed; false success and lost acknowledged data are not.
+
+These are bounded, reproducible load scenarios, not production capacity claims or latency SLOs. History artifacts report p50/p95/max acknowledged response latency and elapsed duration, including driver ledger overhead. Docker limits are local to the owned containers and are raised to a verified 512 MiB before recovery and the owned containers are removed afterward. The pinned Node sidecar adds a network hop; do not compare its timings directly with the older direct-MinIO suites.
+
+Each scenario has an eight-minute bound and separate artifacts under its ID. The aggregate report and JUnit retain unexecuted placeholders and infrastructure failures. CI runs each group independently. Local Docker results do not qualify AWS, managed Cloudflare delivery guarantees, or host/availability-zone failure domains.
+
+References: [Cloudflare queue APIs](https://developers.cloudflare.com/queues/configuration/javascript-apis/), [workflow sleeping and retrying](https://developers.cloudflare.com/workflows/build/sleeping-and-retrying/), and [Durable Object WebSocket hibernation](https://developers.cloudflare.com/durable-objects/best-practices/websockets/).

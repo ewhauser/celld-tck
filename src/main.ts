@@ -7,10 +7,24 @@ import { resolve } from "node:path";
 import { artifactsLayer } from "./Artifacts.js";
 import { TckError } from "./Domain.js";
 import { processesLayer } from "./Processes.js";
+import { auditLedger } from "./Audit.js";
+import { runQualification } from "./Qualification.js";
 import { runMultinode } from "./Multinode.js";
 import { runRecovery } from "./Recovery.js";
 import { runSuite, selectCases } from "./Runner.js";
 import { transportLayer } from "./Transport.js";
+
+const qualificationSuites = [
+  "qualification",
+  "traffic",
+  "dependencies",
+  "faults",
+  "capacity",
+] as const;
+const isQualification = (
+  suite: string,
+): suite is (typeof qualificationSuites)[number] =>
+  (qualificationSuites as readonly string[]).includes(suite);
 
 const cli = Command.make(
   "celld-tck",
@@ -29,6 +43,12 @@ const cli = Command.make(
       "multinode",
       "fleet",
       "resilience",
+      "qualification",
+      "audit",
+      "traffic",
+      "dependencies",
+      "faults",
+      "capacity",
     ]).pipe(Flag.withDefault("all")),
     knownBugs: Flag.Literals("known-bugs", ["allow", "error"]).pipe(
       Flag.withDefault("allow"),
@@ -36,6 +56,9 @@ const cli = Command.make(
     seed: Flag.Int("seed").pipe(Flag.withDefault(42)),
     caseId: Flag.String("case").pipe(Flag.withDefault("")),
     output: Flag.String("output").pipe(Flag.withDefault("artifacts")),
+    ledger: Flag.String("ledger").pipe(Flag.withDefault("")),
+    endpoint: Flag.String("endpoint").pipe(Flag.withDefault("")),
+    name: Flag.String("name").pipe(Flag.withDefault("")),
   },
   (options) =>
     Effect.gen(function* () {
@@ -47,10 +70,12 @@ const cli = Command.make(
           }),
         );
       if (
+        options.suite !== "audit" &&
         options.suite !== "recovery" &&
         options.suite !== "multinode" &&
         options.suite !== "fleet" &&
-        options.suite !== "resilience"
+        options.suite !== "resilience" &&
+        !isQualification(options.suite)
       )
         yield* selectCases(options.caseId, options.suite);
       const runId = `tck-${yield* Effect.sync(() => randomUUID())}`;
@@ -58,20 +83,24 @@ const cli = Command.make(
         Layer.provideMerge(artifactsLayer(resolve(options.output, runId))),
       );
       const run =
-        options.suite === "resilience"
-          ? runMultinode({
-              ...options,
-              runId,
-              durability: "fleet",
-              resilience: true,
-            })
-          : options.suite === "fleet"
-            ? runMultinode({ ...options, runId, durability: "fleet" })
-            : options.suite === "multinode"
-              ? runMultinode({ ...options, runId })
-              : options.suite === "recovery"
-                ? runRecovery({ ...options, runId })
-                : runSuite({ ...options, runId, suite: options.suite });
+        options.suite === "audit"
+          ? auditLedger(options)
+          : isQualification(options.suite)
+            ? runQualification({ ...options, runId })
+            : options.suite === "resilience"
+              ? runMultinode({
+                  ...options,
+                  runId,
+                  durability: "fleet",
+                  resilience: true,
+                })
+              : options.suite === "fleet"
+                ? runMultinode({ ...options, runId, durability: "fleet" })
+                : options.suite === "multinode"
+                  ? runMultinode({ ...options, runId })
+                  : options.suite === "recovery"
+                    ? runRecovery({ ...options, runId })
+                    : runSuite({ ...options, runId, suite: options.suite });
       yield* run.pipe(Effect.provide(services));
     }),
 );

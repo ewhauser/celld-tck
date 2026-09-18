@@ -1,4 +1,5 @@
 import { Effect, Exit, FileSystem, Schema, Schedule } from "effect";
+import { build } from "esbuild";
 import { resolve } from "node:path";
 import { fleetControls } from "./FleetControls.js";
 import { DiskContainer, DiskVolume, ownedStateVolume } from "./DiskLoss.js";
@@ -30,6 +31,7 @@ export const acquireLocal = (
   multiNode = false,
   durability: "bucket" | "fleet" = "bucket",
   nodeCount: 2 | 3 = 2,
+  qualification = false,
 ) =>
   Effect.gen(function* () {
     const processes = yield* Processes;
@@ -90,9 +92,16 @@ export const acquireLocal = (
                 new URL("../infra/three-node.yaml", import.meta.url).pathname,
               ]
             : []),
+          ...(qualification
+            ? [
+                "--file",
+                new URL("../infra/qualification.yaml", import.meta.url)
+                  .pathname,
+              ]
+            : []),
           ...args,
         ],
-        { TCK_FIXTURE_DIR: bundle.directory },
+        { TCK_FIXTURE_DIR: bundle.directory, TCK_DURABILITY: durability },
       );
     yield* artifacts.text(
       "compose.yaml",
@@ -119,10 +128,49 @@ export const acquireLocal = (
           new URL("../infra/three-node.yaml", import.meta.url).pathname,
         ),
       );
+    if (qualification) {
+      yield* Effect.tryPromise({
+        try: () =>
+          build({
+            entryPoints: [
+              new URL("./StorageProxy.ts", import.meta.url).pathname,
+            ],
+            bundle: true,
+            platform: "node",
+            format: "esm",
+            outfile: resolve(bundle.directory, "proxy.mjs"),
+          }),
+        catch: (error) =>
+          new TckError({ phase: "build", message: String(error) }),
+      });
+      yield* artifacts.text(
+        "qualification.yaml",
+        yield* fs.readFileString(
+          new URL("../infra/qualification.yaml", import.meta.url).pathname,
+        ),
+      );
+    }
     return yield* owned(
       Effect.gen(function* () {
         yield* compose(["up", "-d", "minio"]);
         yield* compose(["run", "--rm", "-T", "storage"]);
+        if (qualification) {
+          yield* compose(["up", "-d", "proxy"]);
+          yield* compose([
+            "exec",
+            "-T",
+            "proxy",
+            "node",
+            "--input-type=module",
+            "-e",
+            'const response = await fetch("http://127.0.0.1:9091/stats"); if (!response.ok) process.exitCode = 1;',
+          ]).pipe(
+            Effect.retry({
+              schedule: Schedule.spaced("200 millis"),
+              times: 20,
+            }),
+          );
+        }
         const diagnosis = yield* compose([
           "run",
           "--rm",
@@ -531,6 +579,38 @@ export const acquireLocal = (
             engine: "celld",
             version: version.replace(/^celld\s+/, ""),
           },
+          controls: {
+            compose,
+            proxy: () =>
+              compose(["port", "proxy", "9091"]).pipe(
+                Effect.map((result) => ({
+                  name: "storage-proxy",
+                  baseUrl: `http://${result.stdout.trim()}`,
+                })),
+              ),
+            deploy: () =>
+              compose([
+                "run",
+                "--rm",
+                "-T",
+                "tool",
+                "deploy",
+                "/fixture",
+                "--json",
+              ]),
+            evict: (node: string, cell: string) =>
+              compose([
+                "exec",
+                "-T",
+                "proxy",
+                "node",
+                "--input-type=module",
+                "-e",
+                `const r = await fetch(${JSON.stringify("http://")} + process.argv[1] + ":8081/evict/Recovery:" + process.argv[2]); console.log(await r.text()); if (!r.ok) process.exitCode=1;`,
+                node,
+                cell,
+              ]),
+          },
           metadata: {
             deploymentChecks,
             engine: "celld",
@@ -542,7 +622,7 @@ export const acquireLocal = (
             fixtureSha256: uploadedHash,
             containers,
           },
-        } satisfies RuntimeHandle & { fleet: typeof fleet };
+        } satisfies RuntimeHandle & { fleet: typeof fleet; controls: unknown };
       }),
       cleanupAll([
         compose(["logs", "--no-color", "--timestamps"]).pipe(

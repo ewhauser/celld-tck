@@ -7,7 +7,7 @@ permissions:
 jobs:
   compatibility:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -26,6 +26,14 @@ jobs:
             command: pnpm test:fleet
           - name: resilience
             command: pnpm test:resilience
+          - name: traffic
+            command: pnpm test:traffic
+          - name: dependencies
+            command: pnpm test:dependencies
+          - name: faults
+            command: pnpm test:faults
+          - name: capacity
+            command: pnpm test:capacity
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4

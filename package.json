@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:reference": "tsx src/main.ts --profile reference",
     "test:local": "tsx src/main.ts --profile local",
-    "types:fixtures": "wrangler types --config fixtures/core/wrangler.jsonc fixtures/core/worker-configuration.d.ts && wrangler types --config fixtures/extensions/wrangler.jsonc --env-interface ExtensionEnv --include-runtime=false fixtures/extensions/worker-configuration.d.ts && wrangler types --config fixtures/repro/wrangler.jsonc --env-interface ReproEnv --include-runtime=false fixtures/repro/worker-configuration.d.ts",
+    "types:fixtures": "wrangler types --config fixtures/core/wrangler.jsonc fixtures/core/worker-configuration.d.ts && wrangler types --config fixtures/extensions/wrangler.jsonc --env-interface ExtensionEnv --include-runtime=false fixtures/extensions/worker-configuration.d.ts && wrangler types --config fixtures/repro/wrangler.jsonc --env-interface ReproEnv --include-runtime=false fixtures/repro/worker-configuration.d.ts && wrangler types --config fixtures/qualification/wrangler.jsonc --env-interface QualificationEnv --include-runtime=false fixtures/qualification/worker-configuration.d.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p fixtures/tsconfig.json && tsc --noEmit -p fixtures/node/tsconfig.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -20,7 +20,12 @@
     "test:recovery": "tsx src/main.ts --profile local --suite recovery",
     "test:multinode": "tsx src/main.ts --profile local --suite multinode",
     "test:fleet": "tsx src/main.ts --profile local --suite fleet",
-    "test:resilience": "tsx src/main.ts --profile local --suite resilience"
+    "test:resilience": "tsx src/main.ts --profile local --suite resilience",
+    "test:qualification": "tsx src/main.ts --profile local --suite qualification",
+    "test:traffic": "tsx src/main.ts --profile local --suite traffic",
+    "test:dependencies": "tsx src/main.ts --profile local --suite dependencies",
+    "test:faults": "tsx src/main.ts --profile local --suite faults",
+    "test:capacity": "tsx src/main.ts --profile local --suite capacity"
   },
   "dependencies": {
     "jsonc-parser": "3.3.1",

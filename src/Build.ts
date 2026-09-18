@@ -11,7 +11,13 @@ export const sha256 = (value: string | Uint8Array) =>
   createHash("sha256").update(value).digest("hex");
 
 export const buildFixtureFor = (
-  fixture: "core" | "node" | "extensions" | "repro" | "recovery",
+  fixture:
+    | "core"
+    | "node"
+    | "extensions"
+    | "repro"
+    | "recovery"
+    | "qualification",
 ) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;

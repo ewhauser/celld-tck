@@ -2,7 +2,46 @@
 
 The suite compares pinned celld v0.5.0 with Miniflare 4.20260730.0 / workerd 1.20260730.1 at compatibility date 2026-07-30. All authored TypeScript uses Effect 4.0.0-rc.115. These are local observations, not AWS or managed Cloudflare qualification.
 
-## Final local validation, September 18, 2026
+## Full checklist qualification, September 18, 2026
+
+The full local P0/P1/P2 checklist is implemented in [QUALIFICATION.md](QUALIFICATION.md). The initial complete 19-case run passed (`tck-43c1b1ac-fe99-4278-8db6-54f696dcac30`). Final review strengthened exact-object fault evidence, workflow return-value validation, and independent KV enumeration so partial KV-only commits cannot escape the SQL-history oracle. The final run with all these checks passed **19/19**, with no harness errors (`tck-7db577c9-6ae1-406e-ba67-31607c5282e9`).
+
+The regression gates completed with no harness errors:
+
+| Gate                     | Result                                                 | Evidence run                               |
+| ------------------------ | ------------------------------------------------------ | ------------------------------------------ |
+| Full qualification       | 19 passed                                              | `tck-7db577c9-6ae1-406e-ba67-31607c5282e9` |
+| Static and unit checks   | Formatting, three TypeScript projects, 49 tests passed | `pnpm check`                               |
+| Reference corpus         | 63 passed                                              | `tck-24b9b35b-1ba4-45d1-9d3f-5af6a834e2fc` |
+| Local API and deployment | 65 passed, 2 divergences, 2 known bugs                 | `tck-24bf595d-9337-4e34-ab9e-85ecb2ba119d` |
+| Single-node recovery     | 5 passed                                               | `tck-40411ea4-a45c-461c-837c-a1dc03c722ec` |
+| Two-node bucket          | 4 passed                                               | `tck-e5afeaa7-ffa6-4b63-b805-88e51e60843f` |
+| Two-node fleet           | 5 passed                                               | `tck-95cf9417-d7b5-4dd9-9450-53ab50fd799d` |
+| Three-node resilience    | 10 passed; final fault declared data loss              | `tck-b6d5180a-1e42-4332-8d17-d6b4c42ba010` |
+
+The latest all-replica-disk-loss case lost acknowledged operations 150, 151, and 154, with a matching loss declaration. Its passing status verifies declared loss outside the surviving-copy assumption; it is not an acknowledged-write preservation result.
+
+The final traffic cases exercised 781 operations: 412 durable acknowledgments all recovered, plus three fully committed operations whose responses were uncertain. Reopened ledger audits and independent KV scans passed. Paused-owner takeover produced no successful receipt from the old activation after takeover. These numbers describe this seeded local schedule, not a general throughput measurement.
+
+The capacity cases verified 16 MiB of pseudorandom restored payloads, four simultaneous slow 8 MiB readers, all 500 queued message IDs, and recovery after both memory pressure and unavailable spare capacity. This run recorded 266 ms for the post-restart blob verification request (excluding startup and lease wait), 13,096 ms for the slow readers, and 5,270 ms for queue submission/drain. These bounded local observations are not production capacity or latency guarantees. Both memory scenarios preserved all 24 baseline acknowledgments after capacity was restored.
+
+The lost-response storage case recorded 37 successful LTX PUT responses dropped after upstream completion. Every fault case requires evidence on the exact test object's data path; neither unrelated lease traffic nor a generic HTTP error can satisfy this requirement. A separate focused fault run also passed all six cases (`tck-c9e60d32-1d5c-4482-aaae-58493d3c4a89`), and the stricter workflow-output check passed independently (`tck-a7a3947f-844b-4ce5-8a8b-0cd3b2c11cb7`).
+
+Docker inspection after the final run found no remaining Compose-owned containers, volumes, or networks, including resources from retained failed development runs. CI now defines eleven independent jobs but has not run remotely. AWS/managed Cloudflare adapters and execution remain separate work requiring dedicated environments. The two existing API bugs, two documented divergences, and INFRA-001 remain visible; no new qualification waiver was introduced.
+
+### Qualification development failures
+
+Failed runs remain in `artifacts/`; no qualification failures were waived. Development exposed and corrected concurrent fleet startup, Docker port restoration after network reconnection, blob verification, and container memory-limit restoration:
+
+- `tck-42acbe89-6a2d-4962-833e-bffc386a066d` and `tck-fece581a-e70d-42f9-9180-061dc350eb1f`: dependency recovery exposed sequential startup waiting for peers that had not yet been started; the latter also retained a diagnostic setup failure. Recovery now starts all nodes concurrently.
+- `tck-994beac9-d1f9-4949-b8eb-e6616c834826`: peer reconnection did not restore Docker's published port. The harness now verifies history through a peer before restarting the reconnected node and refreshing its endpoint. The rolling case also retained a storage-diagnostic failure.
+- `tck-36d05b4b-891c-4dc6-8b69-65816a013ec9`: blob validation and the initial spare-capacity assumption failed. The fixture now verifies deterministic pseudorandom bytes; insufficient-spare testing requires both constrained replacements to be stopped.
+- `tck-bc5acb8b-b97f-49c1-a344-bf86d1177b6d`: Docker's `--memory 0` did not remove the imposed limit. Recovery now raises and verifies each constrained node's limit to 512 MiB.
+- `tck-6709f125-e671-4501-b698-302f9284d995`: Docker reported exit 137 under the verified limit without setting `OOMKilled`. Reports retain both observations separately; the scenario requires a successful verified allocation or an observed termination under the imposed limit, and full acknowledged-data recovery afterward.
+
+Qualification now diagnoses the same proxy route it uses for storage before enabling faults. This does not resolve or waive INFRA-001 on the original direct-MinIO path. Negative unit cases reject wrong-object fault evidence, missing/duplicate/corrupt/orphaned history, stale-owner receipts, malformed ledgers, and incorrect workflow output. Actual network proxy tests exercise latency, timeout, throttling, and response loss after upstream success.
+
+## Earlier local validation, September 18, 2026
 
 | Gate                     | Result                                                 | Evidence run                               |
 | ------------------------ | ------------------------------------------------------ | ------------------------------------------ |
@@ -16,7 +55,7 @@ The suite compares pinned celld v0.5.0 with Miniflare 4.20260730.0 / workerd 1.2
 
 All six runtime commands exited zero with no harness errors. Docker inspection confirmed that their owned containers, volumes, and networks were removed; the three failed development runs were also clean. The CI matrix is configured but has not run remotely. No AWS or managed Cloudflare execution is claimed. The all-disk-loss result and retained development failures are explained below.
 
-## Current known-bug policy validation
+## Known-bug policy validation
 
 - `pnpm check`: formatting, three TypeScript projects, and 41 harness tests passed.
 - Full local run: **65 passed, 2 divergences, 2 known bugs**, exit 0 (`tck-bf4d440f-34e8-41a2-868c-c6f4cbe684c0`).
@@ -97,6 +136,6 @@ Two runs exposed scenario setup assumptions: `tck-ec3da2e5-73ac-4d9e-a188-cab70c
 
 ## Scope
 
-See [coverage.json](coverage.json) for exact coverage and exclusions. The corpus exercises real network HTTP/WebSocket calls, actual alarms, Queue delivery/retry, Workflow execution/retry/events, and uploaded fixture modules. Miniflare's KV/D1/R2/Queues/Workflows implementations remain local service emulators. Passing these cases does not establish edge caching, production service latency, host-failure durability, hibernation, or correctness under all multi-node failure schedules.
+See [coverage.json](coverage.json) for exact coverage and exclusions. The corpus exercises real network HTTP/WebSocket calls, actual alarms, Queue delivery/retry, Workflow execution/retry/events, and uploaded fixture modules. Miniflare's KV/D1/R2/Queues/Workflows implementations remain local service emulators. Passing these cases does not establish edge caching, production service latency, host-failure durability or correctness under all multi-node failure schedules. Actual hibernation and a bounded set of fault/load schedules are now covered by the separate [qualification suite](QUALIFICATION.md).
 
 No upstream fixes, commits, pushes, or cloud deployments are part of this change.
