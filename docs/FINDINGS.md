@@ -4,7 +4,7 @@ The suite compares pinned celld v0.5.0 with Miniflare 4.20260730.0 / workerd 1.2
 
 ## Current known-bug policy validation
 
-- `pnpm check`: formatting, three TypeScript projects, and 30 harness tests passed.
+- `pnpm check`: formatting, three TypeScript projects, and 31 harness tests passed.
 - Full local run: **65 passed, 2 divergences, 2 known bugs**, exit 0 (`tck-b3d376f9-1c06-49c1-8919-9f0cdf333d7b`).
 - Reference reproductions: **2 passed**, exit 0 (`tck-e1f63e03-89b2-4b67-a101-206498064bb0`).
 - Local reproductions: **2 known bugs**, exit 0 (`tck-7c0e3f3e-47bd-46ed-9a5f-a759e0d255e1`).
@@ -49,6 +49,10 @@ Two runs encountered a connection reset during celld's conditional-write storage
 - `tck-fa6996a9-1724-4166-80ea-e848ecb2bebe` (core setup).
 
 The diagnostic failed while updating its probe object, reported that the write may have committed, and returned exit 1. The harness did not bypass or automatically retry it. The raw diagnosis is retained in each run's `commands.jsonl`; cleanup ran and unexecuted cases remained infrastructure errors. Other runs completed storage diagnostics and all selected API cases. This transient local storage/transport issue remains unresolved and is not relabeled as API incompatibility.
+
+## Local process recovery
+
+The separate [recovery suite](RECOVERY.md) passed graceful restart, SIGKILL recovery of acknowledged state, and an alarm due while the process was stopped (`tck-aa23e90c-8fe3-4491-92bd-6dc419459de6`). Both local disks were retained; no disk-loss or multi-node recovery claim is made.
 
 ## Scope
 

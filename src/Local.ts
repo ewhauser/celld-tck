@@ -189,7 +189,96 @@ export const acquireLocal = (
           imageId: entry.Image,
           platform: entry.Platform,
         }));
+        const target = {
+          name: "candidate",
+          baseUrl: `http://${address}`,
+          engine: "celld" as const,
+          version: version.replace(/^celld\s+/, ""),
+        };
+        let sequence = 0;
+        const recordState = (label: string) =>
+          Effect.gen(function* () {
+            const id = (yield* compose([
+              "ps",
+              "--all",
+              "-q",
+              "celld",
+            ])).stdout.trim();
+            const output = yield* processes.run("docker", ["inspect", id]);
+            yield* artifacts.text(
+              `lifecycle-${++sequence}-${label}.json`,
+              output.stdout,
+            );
+            return yield* decodeJson(
+              Schema.Array(
+                Schema.Struct({
+                  State: Schema.Struct({
+                    Running: Schema.Boolean,
+                    ExitCode: Schema.Number,
+                  }),
+                }),
+              ),
+              output.stdout,
+            );
+          });
         return {
+          lifecycle: {
+            stop: (crash: boolean) =>
+              Effect.gen(function* () {
+                const before = (yield* recordState("before-stop"))[0]?.State;
+                if (!before?.Running)
+                  return yield* Effect.fail(
+                    new TckError({
+                      phase: "lifecycle",
+                      message:
+                        "Expected a running container before fault injection",
+                    }),
+                  );
+                yield* compose(
+                  crash
+                    ? ["kill", "--signal", "SIGKILL", "celld"]
+                    : ["stop", "--timeout", "20", "celld"],
+                );
+                const state = (yield* recordState("stopped"))[0]?.State;
+                if (
+                  !state ||
+                  state.Running ||
+                  (crash ? state.ExitCode !== 137 : state.ExitCode !== 0)
+                )
+                  return yield* Effect.fail(
+                    new TckError({
+                      phase: "lifecycle",
+                      message:
+                        "Container did not stop with the expected exit status",
+                    }),
+                  );
+              }),
+            start: () =>
+              Effect.gen(function* () {
+                yield* compose(["start", "celld"]);
+                const started = (yield* recordState("started"))[0]?.State;
+                if (!started?.Running)
+                  return yield* Effect.fail(
+                    new TckError({
+                      phase: "lifecycle",
+                      message: "Container did not start",
+                    }),
+                  );
+                const endpoint = (yield* compose([
+                  "port",
+                  "celld",
+                  "8080",
+                ])).stdout.trim();
+                if (!/^127\.0\.0\.1:\d+$/.test(endpoint))
+                  return yield* Effect.fail(
+                    new TckError({
+                      phase: "lifecycle",
+                      message: "Invalid restarted endpoint",
+                    }),
+                  );
+                return { ...target, baseUrl: `http://${endpoint}` };
+              }),
+          },
           target: {
             name: "candidate",
             baseUrl: `http://${address}`,

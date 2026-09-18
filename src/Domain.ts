@@ -99,6 +99,10 @@ export interface Bundle {
   readonly binding: { readonly name: string; readonly className: string };
 }
 export interface RuntimeHandle {
+  readonly lifecycle?: {
+    readonly stop: (crash: boolean) => Effect.Effect<void, TckError>;
+    readonly start: () => Effect.Effect<Target, TckError>;
+  };
   readonly target: Target;
   readonly metadata: Readonly<Record<string, unknown>>;
 }

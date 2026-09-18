@@ -7,6 +7,7 @@ import { resolve } from "node:path";
 import { artifactsLayer } from "./Artifacts.js";
 import { TckError } from "./Domain.js";
 import { processesLayer } from "./Processes.js";
+import { runRecovery } from "./Recovery.js";
 import { runSuite, selectCases } from "./Runner.js";
 import { transportLayer } from "./Transport.js";
 
@@ -23,6 +24,7 @@ const cli = Command.make(
       "node",
       "extensions",
       "repros",
+      "recovery",
     ]).pipe(Flag.withDefault("all")),
     knownBugs: Flag.Literals("known-bugs", ["allow", "error"]).pipe(
       Flag.withDefault("allow"),
@@ -40,12 +42,17 @@ const cli = Command.make(
             message: "Seed must be an unsigned 32-bit integer",
           }),
         );
-      yield* selectCases(options.caseId, options.suite);
+      if (options.suite !== "recovery")
+        yield* selectCases(options.caseId, options.suite);
       const runId = `tck-${yield* Effect.sync(() => randomUUID())}`;
       const services = Layer.mergeAll(processesLayer, transportLayer).pipe(
         Layer.provideMerge(artifactsLayer(resolve(options.output, runId))),
       );
-      yield* runSuite({ ...options, runId }).pipe(Effect.provide(services));
+      const run =
+        options.suite === "recovery"
+          ? runRecovery({ ...options, runId })
+          : runSuite({ ...options, runId, suite: options.suite });
+      yield* run.pipe(Effect.provide(services));
     }),
 );
 

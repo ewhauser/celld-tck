@@ -2,7 +2,7 @@
 
 An independent API compatibility test kit for celld, written in **Effect v4 RC.115**. Identical Worker/Durable Object bundles run on workerd and real celld. The external driver checks each engine against semantic expectations before comparing observations.
 
-The local API corpus contains **63 differential cases plus 6 celld deployment checks**. It covers the API families in [docs/coverage.json](docs/coverage.json). This is a versioned contract corpus, not an exhaustive proof for every API input or distributed schedule. AWS provisioning, multi-node recovery, container/Sandbox APIs, and managed Cloudflare qualification are separate work.
+The local API corpus contains **63 differential cases plus 6 celld deployment checks**. It covers the API families in [docs/coverage.json](docs/coverage.json). This is a versioned contract corpus, not an exhaustive proof for every API input or distributed schedule. Single-node process restart tests are available separately in [docs/RECOVERY.md](docs/RECOVERY.md). AWS provisioning, multi-node recovery, container/Sandbox APIs, and managed Cloudflare qualification are separate work.
 
 ## Run
 
@@ -13,6 +13,7 @@ pnpm install --frozen-lockfile
 pnpm check
 pnpm test:reference
 pnpm test:local
+pnpm test:recovery
 ```
 
 `test:reference` runs two independently persisted workerd instances; it validates the harness and expectations. `test:local` compares workerd with actual celld backed by MinIO using bucket durability. An unexpected failed compatibility case makes the command exit nonzero, while the remaining cases continue. Exact version-scoped [known bugs](docs/BUGS.md) are reported separately and do not fail the default run; use `--known-bugs error` for strict enforcement. **A complete test suite does not imply that celld passes it.** See [docs/FINDINGS.md](docs/FINDINGS.md) for the observed differences.

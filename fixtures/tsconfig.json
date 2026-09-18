@@ -15,6 +15,7 @@
     "core/**/*.ts",
     "shared/**/*.ts",
     "extensions/**/*.ts",
-    "repro/**/*.ts"
+    "repro/**/*.ts",
+    "recovery/**/*.ts"
   ]
 }
