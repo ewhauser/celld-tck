@@ -1,5 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
+// oxlint-disable-next-line effect/use-http-client-service -- The proxy test needs a real Node HTTP upstream to verify socket faults.
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { acquireStorageProxy } from "../src/StorageProxy.js";

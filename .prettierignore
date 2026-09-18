@@ -1,8 +1,0 @@
-pnpm-lock.yaml
-.cache/
-.wrangler/
-artifacts/
-fixtures/core/worker-configuration.d.ts
-
-fixtures/extensions/worker-configuration.d.ts
-fixtures/repro/worker-configuration.d.ts

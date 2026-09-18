@@ -320,7 +320,8 @@ export const web = (request: Request) =>
         const pending = writer.write("one");
         const blocked = writer.desiredSize;
         yield* platform(() => Promise.resolve());
-        if (!release) throw new Error("write was not started");
+        if (!release)
+          return yield* Effect.fail(new Error("write was not started"));
         release();
         yield* platform(() => pending);
         yield* platform(() => writer.ready);

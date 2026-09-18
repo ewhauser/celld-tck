@@ -1,4 +1,4 @@
-import { Effect, FileSystem, Schema } from "effect";
+import { Effect, FileSystem } from "effect";
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";

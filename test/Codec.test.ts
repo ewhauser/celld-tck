@@ -18,6 +18,7 @@ it.effect("preserves distinctions JSON loses", () =>
       { type: "bigint", value: "1" },
     ]);
     expect(encode({})).not.toEqual(encode({ missing: undefined }));
+    // oxlint-disable-next-line unicorn/no-new-array -- A sparse hole must differ from an explicit undefined element.
     expect(encode([undefined])).not.toEqual(encode(new Array(1)));
   }),
 );
