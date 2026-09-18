@@ -2,7 +2,7 @@ import { waitForReady } from "./Polling.js";
 import { Effect, Schema } from "effect";
 import { pollUntil } from "./Polling.js";
 import { Artifacts } from "./Artifacts.js";
-import { Transport, type Target } from "./Domain.js";
+import { attemptRequest, Transport, type Target } from "./Domain.js";
 import type { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
 import {
@@ -85,17 +85,12 @@ export const makeContext = (
           at: Date.now(),
           node,
         });
-        const result = yield* request(
-          "/history/write",
-          node,
-          "POST",
-          JSON.stringify({ id, payload }),
-        ).pipe(
-          Effect.map((response) => ({ response })),
-          Effect.catch((error) =>
-            error.phase === "http"
-              ? Effect.succeed({ error: error.message })
-              : Effect.fail(error),
+        const result = yield* attemptRequest(
+          request(
+            "/history/write",
+            node,
+            "POST",
+            JSON.stringify({ id, payload }),
           ),
         );
         if (

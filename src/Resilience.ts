@@ -1,10 +1,15 @@
 import { retryRead, pendingPhase } from "./Polling.js";
 import { Effect, Exit, Fiber, Schema } from "effect";
 import { Artifacts } from "./Artifacts.js";
-import { TckError, type Observation } from "./Domain.js";
+import { attemptRequest, TckError, type Observation } from "./Domain.js";
 import { type Node, type fleetControls } from "./FleetControls.js";
 import { equal } from "./Oracle.js";
-import { checkOutageState, OutageState, type WriteOutcome } from "./Outage.js";
+import {
+  checkOutageState,
+  classifyWrite,
+  OutageState,
+  type WriteOutcome,
+} from "./Outage.js";
 
 type Fleet = Effect.Success<ReturnType<typeof fleetControls>>;
 export interface ResilienceContext {
@@ -170,34 +175,14 @@ export const resilienceStages = (ctx: ResilienceContext) =>
             const operations = yield* Effect.forEach(
               [120, 121, 122, 123, 124, 125],
               (id) =>
-                ctx
-                  .request(prior.node, `/outage/write?id=${id}&hold=1`, "POST")
-                  .pipe(
-                    Effect.flatMap((result) =>
-                      Effect.gen(function* () {
-                        if (result.status >= 200 && result.status < 300) {
-                          yield* equal(result.status, 200);
-                          yield* equal(result.body, { acknowledged: id });
-                          return {
-                            id,
-                            acknowledged: true,
-                            observation: result,
-                          };
-                        }
-                        return { id, acknowledged: false, observation: result };
-                      }),
-                    ),
-                    Effect.catch((error) =>
-                      error.phase === "http"
-                        ? Effect.succeed({
-                            id,
-                            acknowledged: false,
-                            error: error.message,
-                          })
-                        : Effect.fail(error),
-                    ),
-                    Effect.forkScoped,
+                classifyWrite(
+                  id,
+                  ctx.request(
+                    prior.node,
+                    `/outage/write?id=${id}&hold=1`,
+                    "POST",
                   ),
+                ).pipe(Effect.forkScoped),
             );
             const entered = yield* fleet.logs(prior.node).pipe(
               Effect.flatMap((logs) =>
@@ -300,13 +285,8 @@ export const resilienceStages = (ctx: ResilienceContext) =>
           yield* Effect.all(nodes.map(ctx.start), { concurrency: "unbounded" });
           // Losing all durable copies exceeds RPO=0. Only full recovery or explicit refusal/loss reporting is acceptable.
           yield* Effect.sleep("15 seconds");
-          const response = yield* ctx.request(nodes[0]!, "/outage/state").pipe(
-            Effect.map((response) => ({ response })),
-            Effect.catch((error) =>
-              error.phase === "http"
-                ? Effect.succeed({ error: error.message })
-                : Effect.fail(error),
-            ),
+          const response = yield* attemptRequest(
+            ctx.request(nodes[0]!, "/outage/state"),
           );
           const losses = yield* fleet.losses();
           const relevant = losses.filter(

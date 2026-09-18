@@ -1,7 +1,14 @@
 import { waitForReady } from "./Polling.js";
 import { Effect, Schema } from "effect";
 import { Artifacts } from "./Artifacts.js";
-import { Transport, type RuntimeHandle, type Target } from "./Domain.js";
+import {
+  attemptRequest,
+  Transport,
+  type Observation,
+  type RuntimeHandle,
+  type Target,
+  type TckError,
+} from "./Domain.js";
 import { equal } from "./Oracle.js";
 
 export const OutageState = Schema.Struct({
@@ -14,6 +21,24 @@ export interface WriteOutcome {
   readonly observation?: unknown;
   readonly error?: string;
 }
+// A 2xx must be exactly the fixture's acknowledgment; any other response or a
+// transport failure leaves the write unacknowledged and possibly committed.
+export const classifyWrite = <R>(
+  id: number,
+  request: Effect.Effect<Observation, TckError, R>,
+): Effect.Effect<WriteOutcome, TckError, R> =>
+  Effect.gen(function* () {
+    const result = yield* attemptRequest(request);
+    if ("error" in result)
+      return { id, acknowledged: false, error: result.error };
+    const observation = result.response;
+    if (observation.status >= 200 && observation.status < 300) {
+      yield* equal(observation.status, 200);
+      yield* equal(observation.body, { acknowledged: id });
+      return { id, acknowledged: true, observation };
+    }
+    return { id, acknowledged: false, observation };
+  });
 export const checkOutageState = (
   state: typeof OutageState.Type,
   outcomes: readonly WriteOutcome[],
@@ -49,32 +74,13 @@ export const runOutage = (
     const outcomes: WriteOutcome[] = [];
     const write = (id: number) =>
       Effect.gen(function* () {
-        const outcome = yield* transport
-          .request(target, {
+        const outcome = yield* classifyWrite(
+          id,
+          transport.request(target, {
             path: `/outage/write?name=${name}&id=${id}`,
             method: "POST",
-          })
-          .pipe(
-            Effect.flatMap((observation) =>
-              Effect.gen(function* () {
-                if (observation.status >= 200 && observation.status < 300) {
-                  yield* equal(observation.status, 200);
-                  yield* equal(observation.body, { acknowledged: id });
-                  return { id, acknowledged: true, observation };
-                }
-                return { id, acknowledged: false, observation };
-              }),
-            ),
-            Effect.catch((error) =>
-              error.phase === "http"
-                ? Effect.succeed({
-                    id,
-                    acknowledged: false,
-                    error: error.message,
-                  })
-                : Effect.fail(error),
-            ),
-          );
+          }),
+        );
         outcomes.push(outcome);
         yield* artifacts.json("outage-write-outcomes.json", outcomes);
         return outcome;
