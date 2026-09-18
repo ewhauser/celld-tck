@@ -6,7 +6,7 @@ import { dirname, resolve } from "node:path";
 import { decodeJson } from "./Artifacts.js";
 import { sha256 } from "./Build.js";
 import { TckError } from "./Domain.js";
-import { ReferenceConfig } from "./Reference.js";
+import { ReferenceConfig } from "./ReferenceConfig.js";
 
 // The parent owns this entire process and captures stdout/stderr. Miniflare's
 // own signal hook can safely stop workerd here without terminating the driver.
