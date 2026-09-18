@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { TckError } from "./Domain.js";
+import { TckError, toTckError } from "./Domain.js";
 // A single bounded protocol conversation with an owned native socket.
 export const converse = (
   url: string,
@@ -65,10 +65,4 @@ export const converse = (
       );
       return events;
     }),
-  ).pipe(
-    Effect.mapError((error) =>
-      error instanceof TckError
-        ? error
-        : new TckError({ phase: "websocket", message: String(error) }),
-    ),
-  );
+  ).pipe(Effect.mapError(toTckError("websocket")));

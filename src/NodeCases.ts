@@ -1,11 +1,12 @@
 import { Effect, Schema } from "effect";
 import { gunzipSync, inflateSync } from "node:zlib";
 import { TckError } from "./Domain.js";
+import { decodeAs } from "./Artifacts.js";
 import { equal } from "./Oracle.js";
 
 export const checkCompression = (value: unknown) =>
   Effect.gen(function* () {
-    const observation = yield* Schema.decodeUnknownEffect(
+    const observation = yield* decodeAs(
       Schema.Struct({
         status: Schema.Literal(200),
         headers: Schema.Record(Schema.String, Schema.String),
@@ -17,11 +18,8 @@ export const checkCompression = (value: unknown) =>
           deflateBytes: Schema.String,
         }),
       }),
-    )(value).pipe(
-      Effect.mapError(
-        (error) => new TckError({ phase: "assertion", message: String(error) }),
-      ),
-    );
+      "assertion",
+    )(value);
     yield* equal(observation.headers, { "content-type": "application/json" });
     const body = observation.body;
     yield* equal(

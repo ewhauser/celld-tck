@@ -7,7 +7,12 @@ import { equal } from "./Oracle.js";
 import { checkDeployment } from "./DeploymentChecks.js";
 import { Artifacts, decodeJson } from "./Artifacts.js";
 import { sha256 } from "./Build.js";
-import { TckError, type Bundle, type RuntimeHandle } from "./Domain.js";
+import {
+  TckError,
+  toTckError,
+  type Bundle,
+  type RuntimeHandle,
+} from "./Domain.js";
 import { Processes } from "./Processes.js";
 import { cleanupAll, owned } from "./Resources.js";
 import { inspectService, mcCat, publishedPort, toolDeploy } from "./Compose.js";
@@ -326,14 +331,7 @@ export const acquireLocal = (options: LocalOptions) =>
                     times: 10,
                   }),
                   Effect.timeout("30 seconds"),
-                  Effect.mapError((error) =>
-                    error instanceof TckError
-                      ? error
-                      : new TckError({
-                          phase: "lifecycle",
-                          message: String(error),
-                        }),
-                  ),
+                  Effect.mapError(toTckError("lifecycle")),
                 );
               }),
             prepareRestart: () =>

@@ -2,7 +2,7 @@ import { Cause, Effect, Layer, Schema, Stream } from "effect";
 import { HttpClient, HttpClientRequest } from "effect/unstable/http";
 import { converse } from "./WebSocket.js";
 import { Artifacts, decodeJson } from "./Artifacts.js";
-import { Transport, TckError, type Observation } from "./Domain.js";
+import { Transport, TckError, toTckError, type Observation } from "./Domain.js";
 
 export const transportLayer = Layer.effect(
   Transport,
@@ -94,11 +94,7 @@ export const transportLayer = Layer.effect(
                 true,
               ),
             ),
-            Effect.mapError((error) =>
-              error instanceof TckError
-                ? error
-                : new TckError({ phase: "http", message: String(error) }),
-            ),
+            Effect.mapError(toTckError("http")),
           );
         }),
     };

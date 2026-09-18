@@ -6,6 +6,12 @@ export class TckError extends Data.TaggedError("TckError")<{
   readonly detail?: string;
 }> {}
 
+/** Preserve an already-typed failure; wrap anything else at the given phase. */
+export const toTckError = (phase: string) => (error: unknown) =>
+  error instanceof TckError
+    ? error
+    : new TckError({ phase, message: String(error) });
+
 // Default celld lease lifetime is 10 seconds. Wait beyond it before restart.
 export const leaseLapse = Effect.sleep("11 seconds");
 
