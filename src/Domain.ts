@@ -100,6 +100,7 @@ export interface Bundle {
 }
 export interface RuntimeHandle {
   readonly lifecycle?: {
+    readonly discardDisk: () => Effect.Effect<void, TckError>;
     readonly stop: (crash: boolean) => Effect.Effect<void, TckError>;
     readonly start: () => Effect.Effect<Target, TckError>;
   };

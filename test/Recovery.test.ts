@@ -32,3 +32,66 @@ it.effect(
       yield* checkRecovered("old", { ...state, fired: true }, true);
     }),
 );
+
+import { ownedStateVolume } from "../src/DiskLoss.js";
+it.effect("disk loss refuses running, foreign, or non-state volumes", () =>
+  Effect.gen(function* () {
+    const project = "tck-test-recovery";
+    const container = {
+      Id: "id",
+      Config: {
+        Labels: {
+          "com.docker.compose.project": project,
+          "com.docker.compose.service": "celld",
+        },
+      },
+      State: { Running: false, StartedAt: "time" },
+      Mounts: [
+        {
+          Type: "volume",
+          Name: `${project}_celld-state`,
+          Destination: "/state",
+        },
+      ],
+    };
+    const volume = {
+      Name: `${project}_celld-state`,
+      Labels: {
+        "com.docker.compose.project": project,
+        "com.docker.compose.volume": "celld-state",
+      },
+    };
+    expect(yield* ownedStateVolume(project, container, volume)).toBe(
+      volume.Name,
+    );
+    for (const bad of [
+      { ...container, State: { ...container.State, Running: true } },
+      {
+        ...container,
+        Config: {
+          Labels: {
+            ...container.Config.Labels,
+            "com.docker.compose.project": "other",
+          },
+        },
+      },
+      { ...container, Mounts: [{ Type: "bind", Destination: "/state" }] },
+      {
+        ...container,
+        Mounts: [{ ...container.Mounts[0]!, Name: `${project}_minio-data` }],
+      },
+      { ...container, Mounts: [...container.Mounts, ...container.Mounts] },
+    ])
+      expect(
+        (yield* Effect.exit(ownedStateVolume(project, bad, volume)))._tag,
+      ).toBe("Failure");
+    expect(
+      (yield* Effect.exit(
+        ownedStateVolume(project, container, {
+          ...volume,
+          Labels: { ...volume.Labels, "com.docker.compose.project": "other" },
+        }),
+      ))._tag,
+    ).toBe("Failure");
+  }),
+);

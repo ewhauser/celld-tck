@@ -1,5 +1,7 @@
 import { Effect, Exit, FileSystem, Schema } from "effect";
 import { resolve } from "node:path";
+import { DiskContainer, DiskVolume, ownedStateVolume } from "./DiskLoss.js";
+import { equal } from "./Oracle.js";
 import { checkDeployment } from "./DeploymentChecks.js";
 import { Artifacts, decodeJson } from "./Artifacts.js";
 import { sha256 } from "./Build.js";
@@ -223,6 +225,105 @@ export const acquireLocal = (
           });
         return {
           lifecycle: {
+            discardDisk: () =>
+              Effect.gen(function* () {
+                const inspectService = (service: string) =>
+                  Effect.gen(function* () {
+                    const id = (yield* compose([
+                      "ps",
+                      "--all",
+                      "-q",
+                      service,
+                    ])).stdout.trim();
+                    const raw = (yield* processes.run("docker", [
+                      "inspect",
+                      id,
+                    ])).stdout;
+                    yield* artifacts.text(
+                      `disk-loss-${++sequence}-${service}.json`,
+                      raw,
+                    );
+                    const entries = yield* decodeJson(
+                      Schema.Array(DiskContainer),
+                      raw,
+                    );
+                    if (entries.length !== 1)
+                      return yield* Effect.fail(
+                        new TckError({
+                          phase: "lifecycle",
+                          message: "Expected one owned container",
+                        }),
+                      );
+                    return entries[0]!;
+                  });
+                const previous = yield* inspectService("celld");
+                const minio = yield* inspectService("minio");
+                const raw = (yield* processes.run("docker", [
+                  "volume",
+                  "inspect",
+                  `${runId}_celld-state`,
+                ])).stdout;
+                yield* artifacts.text("disk-loss-old-volume.json", raw);
+                const volumes = yield* decodeJson(
+                  Schema.Array(DiskVolume),
+                  raw,
+                );
+                if (volumes.length !== 1)
+                  return yield* Effect.fail(
+                    new TckError({
+                      phase: "lifecycle",
+                      message: "Expected one state volume",
+                    }),
+                  );
+                const name = yield* ownedStateVolume(
+                  runId,
+                  previous,
+                  volumes[0]!,
+                );
+                const logs = yield* compose([
+                  "logs",
+                  "--no-color",
+                  "--timestamps",
+                  "celld",
+                ]);
+                yield* artifacts.text(
+                  "celld-before-disk-loss.log",
+                  logs.stdout + logs.stderr,
+                );
+                yield* compose(["rm", "--force", "celld"]);
+                yield* processes.run("docker", ["volume", "rm", name]);
+                yield* compose(["create", "celld"]);
+                const replacement = yield* inspectService("celld");
+                if (replacement.Id === previous.Id)
+                  return yield* Effect.fail(
+                    new TckError({
+                      phase: "lifecycle",
+                      message: "Container was not replaced",
+                    }),
+                  );
+                // Verify the recreated disk is empty before any celld process can use it.
+                yield* compose([
+                  "run",
+                  "--no-deps",
+                  "--rm",
+                  "-T",
+                  "--volume",
+                  `${name}:/empty:ro`,
+                  "--entrypoint",
+                  "/bin/sh",
+                  "storage",
+                  "-ec",
+                  'entries=$(ls -A /empty); test -z "$entries"',
+                ]);
+                yield* equal(yield* inspectService("minio"), minio);
+                yield* artifacts.json("disk-loss.json", {
+                  removedVolume: name,
+                  oldContainer: previous.Id,
+                  newContainer: replacement.Id,
+                  emptyBeforeStart: true,
+                  minioUnchanged: true,
+                });
+              }),
             stop: (crash: boolean) =>
               Effect.gen(function* () {
                 const before = (yield* recordState("before-stop"))[0]?.State;

@@ -2,7 +2,7 @@
 
 An independent API compatibility test kit for celld, written in **Effect v4 RC.115**. Identical Worker/Durable Object bundles run on workerd and real celld. The external driver checks each engine against semantic expectations before comparing observations.
 
-The local API corpus contains **63 differential cases plus 6 celld deployment checks**. It covers the API families in [docs/coverage.json](docs/coverage.json). This is a versioned contract corpus, not an exhaustive proof for every API input or distributed schedule. Single-node process restart tests are available separately in [docs/RECOVERY.md](docs/RECOVERY.md). AWS provisioning, multi-node recovery, container/Sandbox APIs, and managed Cloudflare qualification are separate work.
+The local API corpus contains **63 differential cases plus 6 celld deployment checks**. It covers the API families in [docs/coverage.json](docs/coverage.json). This is a versioned contract corpus, not an exhaustive proof for every API input or distributed schedule. Single-node process restart and disk-loss recovery tests are available separately in [docs/RECOVERY.md](docs/RECOVERY.md). AWS provisioning, multi-node recovery, container/Sandbox APIs, and managed Cloudflare qualification are separate work.
 
 ## Run
 

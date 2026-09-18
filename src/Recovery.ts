@@ -16,6 +16,7 @@ export const recoveryIds = [
   "recovery.graceful",
   "recovery.crash",
   "recovery.overdue-alarm",
+  "recovery.disk-loss",
 ] as const;
 const Snapshot = Schema.Struct({
   activation: Schema.String,
@@ -84,7 +85,7 @@ export const runRecovery = (options: {
     const environment: Record<string, unknown> = {
       suite: "recovery",
       reference: "none; lifecycle invariants",
-      localDiskRetained: true,
+      localDiskRetained: !ids.includes("recovery.disk-loss"),
     };
     yield* artifacts.json("run.json", {
       ...options,
@@ -151,7 +152,8 @@ export const runRecovery = (options: {
                 // Verify all stored state before the fault without requiring a new activation.
                 yield* checkRecovered("not-an-activation", initial, false);
                 yield* equal(initial.activation, seeded.activation);
-                const alarm = id === "recovery.overdue-alarm";
+                const diskLoss = id === "recovery.disk-loss";
+                const alarm = id === "recovery.overdue-alarm" || diskLoss;
                 let deadline = 0;
                 if (alarm)
                   deadline = (yield* request("/arm", name, "POST").pipe(
@@ -172,6 +174,7 @@ export const runRecovery = (options: {
                   );
                 // Default celld lease lifetime is 10 seconds. Wait beyond it before restart.
                 yield* Effect.sleep("11 seconds");
+                if (diskLoss) yield* lifecycle.discardDisk();
                 target = yield* lifecycle.start();
                 yield* ready();
                 const recovered = alarm
@@ -196,6 +199,7 @@ export const runRecovery = (options: {
                     )
                   : yield* read();
                 yield* artifacts.json(`${id}-observations.json`, {
+                  localDiskRetained: !diskLoss,
                   seeded,
                   initial,
                   recovered,
