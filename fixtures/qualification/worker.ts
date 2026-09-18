@@ -185,19 +185,6 @@ export class Recovery extends DurableObject<QualificationEnv> {
           }
           return Response.json({ count, bytes });
         }
-        if (url.pathname === "/pressure") {
-          const mb = Number(url.searchParams.get("mb") ?? 16);
-          if (!Number.isInteger(mb) || mb < 1 || mb > 256)
-            return new Response("invalid size", { status: 400 });
-          const buffers = Array.from({ length: mb }, (_, i) =>
-            new Uint8Array(1024 * 1024).fill(i % 251),
-          );
-          yield* Effect.sleep("2 seconds");
-          return Response.json({
-            mb,
-            checksum: buffers.reduce((sum, item) => sum + item[0]!, 0),
-          });
-        }
         if (url.pathname === "/events")
           return Response.json([...storage.kv.list({ prefix: "event:" })]);
         return new Response("not found", { status: 404 });
@@ -254,6 +241,20 @@ export default {
     return Effect.runPromise(
       Effect.gen(function* () {
         const url = new URL(request.url);
+        // Worker-local: a Durable Object request may execute on another node.
+        if (url.pathname === "/pressure") {
+          const mb = Number(url.searchParams.get("mb") ?? 16);
+          if (!Number.isInteger(mb) || mb < 1 || mb > 256)
+            return new Response("invalid size", { status: 400 });
+          const buffers = Array.from({ length: mb }, (_, i) =>
+            new Uint8Array(1024 * 1024).fill(i % 251),
+          );
+          yield* Effect.sleep("2 seconds");
+          return Response.json({
+            mb,
+            checksum: buffers.reduce((sum, item) => sum + item[0]!, 0),
+          });
+        }
         const name = url.searchParams.get("name") ?? "ready";
         if (url.pathname === "/queue/send") {
           const count = Number(url.searchParams.get("count") ?? 1);

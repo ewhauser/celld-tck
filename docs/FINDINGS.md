@@ -1,5 +1,13 @@
 # Local compatibility findings
 
+## Hosted CI follow-up
+
+[The first README revision's CI run](https://github.com/ewhauser/celld-tck/actions/runs/35384604319) failed in five jobs. Local API, multinode, resilience, and rolling-deployment setup failed on the conditional update immediately after the diagnostic's expected rejected create. The fault proxy also reproduced this failure with upstream connection pooling enabled. Setup diagnostics now use fresh upstream connections through the proxy; qualification runtime traffic uses the same policy. Other runtime traffic remains direct to MinIO. No write retries, diagnostic waivers, or semantic expectation changes were added. The underlying celld/MinIO interaction remains tracked as INFRA-001.
+
+The insufficient-spare scenario sent allocation requests through a Durable Object, which could route them to its owner instead of the constrained node. CI retained a successful 96 MiB allocation response from a node limited to 8 MiB, while that receiving node remained alive. Memory pressure now runs in the receiving Worker. A workerd regression test rejects any Durable Object dispatch for that endpoint; a separate network test verifies fresh proxy connections, preserved rejection responses and request bodies, and no extra writes. Both regression tests failed before the fixes and passed afterward.
+
+Local validation passed `pnpm check` (51 tests), the full API suite (`tck-a750e7b9-e25d-4e40-9f7b-b0254cd77520`), and the insufficient-spare scenario (`tck-79572b57-1b8d-4230-a8c0-7b78c1f83a52`). API results retain two known-bug cases and two intentional divergences. Hosted validation of these changes is pending; no AWS qualification was performed.
+
 The suite compares pinned celld v0.5.0 with Miniflare 4.20260730.0 / workerd 1.20260730.1 at compatibility date 2026-07-30. All authored TypeScript uses Effect 4.0.0-rc.115. These are local observations, not AWS or managed Cloudflare qualification.
 
 ## Full checklist qualification, September 18, 2026

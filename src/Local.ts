@@ -74,6 +74,8 @@ export const acquireLocal = (
           runId,
           "--file",
           composePath,
+          "--file",
+          new URL("../infra/storage-proxy.yaml", import.meta.url).pathname,
           ...(multiNode
             ? [
                 "--file",
@@ -128,7 +130,7 @@ export const acquireLocal = (
           new URL("../infra/three-node.yaml", import.meta.url).pathname,
         ),
       );
-    if (qualification) {
+    {
       yield* Effect.tryPromise({
         try: () =>
           build({
@@ -144,6 +146,14 @@ export const acquireLocal = (
           new TckError({ phase: "build", message: String(error) }),
       });
       yield* artifacts.text(
+        "storage-proxy.yaml",
+        yield* fs.readFileString(
+          new URL("../infra/storage-proxy.yaml", import.meta.url).pathname,
+        ),
+      );
+    }
+    if (qualification) {
+      yield* artifacts.text(
         "qualification.yaml",
         yield* fs.readFileString(
           new URL("../infra/qualification.yaml", import.meta.url).pathname,
@@ -154,7 +164,7 @@ export const acquireLocal = (
       Effect.gen(function* () {
         yield* compose(["up", "-d", "minio"]);
         yield* compose(["run", "--rm", "-T", "storage"]);
-        if (qualification) {
+        {
           yield* compose(["up", "-d", "proxy"]);
           yield* compose([
             "exec",
@@ -175,6 +185,8 @@ export const acquireLocal = (
           "run",
           "--rm",
           "-T",
+          "--env",
+          "S3_ENDPOINT=http://proxy:8082",
           "tool",
           "diagnose",
           "--json",

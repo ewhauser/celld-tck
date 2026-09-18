@@ -69,3 +69,62 @@ it.live(
       }),
     ).pipe(Effect.timeout("10 seconds")),
 );
+
+it.live(
+  "uses a fresh upstream connection after a rejected conditional write without retrying",
+  () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const sockets = new Set<unknown>();
+        const bodies: string[] = [];
+        const upstream = createServer((req, res) => {
+          sockets.add(req.socket);
+          let body = "";
+          req.setEncoding("utf8");
+          req.on("data", (chunk: string) => {
+            body += chunk;
+          });
+          req.on("end", () => {
+            bodies.push(body);
+            res.writeHead(req.headers["if-none-match"] === "*" ? 412 : 200);
+            res.end("observed");
+          });
+        });
+        yield* Effect.acquireRelease(
+          Effect.callback<void>((resume) => {
+            upstream.listen(0, "127.0.0.1", () => resume(Effect.void));
+          }),
+          () =>
+            Effect.sync(() => {
+              upstream.closeAllConnections();
+              upstream.close();
+            }),
+        );
+        const proxy = yield* acquireStorageProxy({
+          upstreamHostname: "127.0.0.1",
+          upstreamPort: (upstream.address() as AddressInfo).port,
+          dataPort: 0,
+          controlPort: 0,
+        });
+        const url = `http://127.0.0.1:${(proxy.data.address() as AddressInfo).port}/object`;
+        for (const conditional of [true, false]) {
+          const response = yield* Effect.tryPromise((signal) =>
+            fetch(url, {
+              method: "PUT",
+              signal,
+              body: conditional ? "rejected" : "updated",
+              headers: conditional
+                ? { "if-none-match": "*" }
+                : { "if-match": "etag" },
+            }),
+          );
+          expect(response.status).toBe(conditional ? 412 : 200);
+          expect(yield* Effect.tryPromise(() => response.text())).toBe(
+            "observed",
+          );
+        }
+        expect(bodies).toEqual(["rejected", "updated"]);
+        expect(sockets.size).toBe(2);
+      }),
+    ),
+);

@@ -69,7 +69,10 @@ export const acquireStorageProxy = (
                 port: config.upstreamPort,
                 path: request.url,
                 method: request.method,
-                headers: request.headers,
+                // MinIO can close a connection after rejecting a conditional PUT.
+                // Never reuse that socket or retry an ambiguously completed write.
+                agent: false,
+                headers: { ...request.headers, connection: "close" },
               },
               (incoming) => {
                 event.upstreamStatus = incoming.statusCode ?? 0;
