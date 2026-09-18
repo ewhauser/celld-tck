@@ -235,6 +235,12 @@ export const buildModel = (
         candidate: cell(definition.key, id),
       })),
     );
+  rows.sort(
+    (left, right) =>
+      left.group.localeCompare(right.group, "en") ||
+      left.id.localeCompare(right.id, "en"),
+  );
+  summaries.sort((left, right) => left.label.localeCompare(right.label, "en"));
   const counts: Record<string, number> = {};
   for (const row of rows)
     for (const value of [row.reference, row.candidate])
