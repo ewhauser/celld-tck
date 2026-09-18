@@ -1,9 +1,5 @@
 import { Effect } from "effect";
-export const platform = <A>(operation: () => PromiseLike<A>) =>
-  Effect.tryPromise({
-    try: () => Promise.resolve(operation()),
-    catch: (cause) => cause,
-  });
+export { platform } from "../shared/Platform.js";
 export const operation = <A>(body: () => A) =>
   Effect.try({ try: body, catch: (cause) => cause });
 export const rejection = (effect: Effect.Effect<unknown, unknown>) =>

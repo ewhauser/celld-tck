@@ -1,10 +1,9 @@
 import { DurableObject } from "cloudflare:workers";
 import { Effect } from "effect";
+import { platform, ready } from "../shared/Platform.js";
 interface RecoveryEnv {
   PROBE: DurableObjectNamespace<Recovery>;
 }
-const platform = <A>(f: () => PromiseLike<A>) =>
-  Effect.tryPromise({ try: () => Promise.resolve(f()), catch: (e) => e });
 export class Recovery extends DurableObject<RecoveryEnv> {
   private readonly activation = crypto.randomUUID();
   alarm() {
@@ -19,7 +18,7 @@ export class Recovery extends DurableObject<RecoveryEnv> {
     return Effect.runPromise(
       Effect.gen(function* () {
         const path = new URL(request.url).pathname;
-        if (path === "/ready") return Response.json({ ready: true });
+        if (path === "/ready") return ready();
         if (path === "/fleet/id") return Response.json({ cell });
         if (path === "/outage/write") {
           const id = Number(new URL(request.url).searchParams.get("id"));
