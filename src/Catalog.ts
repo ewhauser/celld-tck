@@ -3,6 +3,7 @@ import { serviceCases } from "./ServiceCases.js";
 import { nodeCases } from "./NodeCases.js";
 import { extensionCases } from "./ExtensionCases.js";
 import { reproCases } from "./ReproCases.js";
+import type { ApiSuite } from "./Suites.js";
 const conformanceCases = [
   ...coreCases,
   ...serviceCases,
@@ -10,13 +11,7 @@ const conformanceCases = [
   ...extensionCases,
 ];
 export const cases = [...conformanceCases, ...reproCases];
-export type Suite =
-  | "all"
-  | "core"
-  | "bindings"
-  | "node"
-  | "extensions"
-  | "repros";
+export type Suite = ApiSuite;
 export const suites = {
   all: conformanceCases,
   repros: reproCases,

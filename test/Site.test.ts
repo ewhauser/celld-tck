@@ -65,7 +65,7 @@ it.effect(
     Effect.sync(() => {
       const result = model();
       expect(result.complete).toBe(true);
-      expect(result.suites).toHaveLength(11);
+      expect(result.suites).toHaveLength(definitions.length);
       expect(result.counts["not-scheduled"]).toBe(4);
       expect(result.counts.missing).toBeUndefined();
       const missing = model({});

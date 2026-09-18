@@ -2,7 +2,8 @@ import { Effect, Schema } from "effect";
 import { pollUntil } from "./Polling.js";
 import { encode, richValue } from "../fixtures/shared/Codec.js";
 import { call, define, response, initialCases } from "./Cases.js";
-import { Transport, TckError, type TestCase } from "./Domain.js";
+import { Transport, TckError, toTckError, type TestCase } from "./Domain.js";
+import { decodeAs } from "./Artifacts.js";
 import { equal } from "./Oracle.js";
 
 export const endpoint = (
@@ -39,7 +40,7 @@ const concurrency = (id: string, path: string): TestCase => ({
     ),
   check: (value) =>
     Effect.gen(function* () {
-      const rows = yield* Schema.decodeUnknownEffect(
+      const rows = yield* decodeAs(
         Schema.Array(
           Schema.Struct({
             status: Schema.Literal(200),
@@ -50,11 +51,8 @@ const concurrency = (id: string, path: string): TestCase => ({
             }),
           }),
         ),
-      )(value).pipe(
-        Effect.mapError(
-          (e) => new TckError({ phase: "assertion", message: String(e) }),
-        ),
-      );
+        "assertion",
+      )(value);
       yield* equal(rows.length, 12);
       // Arrival order is intentionally not asserted; the observed transitions must
       // form a legal serialized history, including every intermediate value.
@@ -75,13 +73,7 @@ export const poll = <A>(
     attempts: 160,
     timeout: "30 seconds",
     message: "Eventual state not reached before deadline",
-  }).pipe(
-    Effect.mapError((error) =>
-      error instanceof TckError
-        ? error
-        : new TckError({ phase: "assertion", message: String(error) }),
-    ),
-  );
+  }).pipe(Effect.mapError(toTckError("assertion")));
 const alarm = (retry: boolean): TestCase => ({
   ...define(
     retry ? "alarms.retry" : "alarms.fire",

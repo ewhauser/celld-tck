@@ -1,25 +1,12 @@
-import { Effect, FileSystem, Schedule, Schema, Stream } from "effect";
+import { Effect, FileSystem, Schedule, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { resolve } from "node:path";
 import { Artifacts, decodeJson } from "./Artifacts.js";
 import { TckError, type Bundle, type RuntimeHandle } from "./Domain.js";
 
-import { FixtureConfig } from "./FixtureConfig.js";
+import { ReferenceConfig, ReferenceReady } from "./ReferenceConfig.js";
 
-export const ReferenceConfig = Schema.Struct({
-  config: FixtureConfig,
-  modules: Schema.Record(Schema.String, Schema.String),
-  name: Schema.String,
-  scriptPath: Schema.String,
-  directory: Schema.String,
-  compatibilityDate: Schema.String,
-  sha256: Schema.String,
-  binding: Schema.Struct({ name: Schema.String, className: Schema.String }),
-});
-export const ReferenceReady = Schema.Struct({
-  target: Schema.Struct({ name: Schema.String, baseUrl: Schema.String }),
-  metadata: Schema.Record(Schema.String, Schema.Unknown),
-});
+export { ReferenceConfig, ReferenceReady };
 
 // Miniflare installs process.exit signal handlers. Keep them outside the driver.
 export const acquireReference = (

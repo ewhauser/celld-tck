@@ -1,5 +1,6 @@
 import { Deferred, Effect, Exit, Fiber, Schema } from "effect";
 import { TckError } from "./Domain.js";
+import { decodeAs } from "./Artifacts.js";
 import { equal } from "./Oracle.js";
 import type { QualificationContext } from "./QualificationContext.js";
 const platform = <A>(f: (signal: AbortSignal) => PromiseLike<A>) =>
@@ -101,14 +102,10 @@ export const runSocketOrStream = (id: string, ctx: QualificationContext) =>
           Effect.callback<unknown, TckError>((resume) => {
             socket.onmessage = (event) =>
               resume(
-                Schema.decodeUnknownEffect(
+                decodeAs(
                   Schema.fromJsonString(Schema.Unknown),
-                )(String(event.data)).pipe(
-                  Effect.mapError(
-                    (e) =>
-                      new TckError({ phase: "decode", message: String(e) }),
-                  ),
-                ),
+                  "decode",
+                )(String(event.data)),
               );
             socket.onerror = () =>
               resume(

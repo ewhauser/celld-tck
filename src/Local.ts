@@ -7,7 +7,12 @@ import { equal } from "./Oracle.js";
 import { checkDeployment } from "./DeploymentChecks.js";
 import { Artifacts, decodeJson } from "./Artifacts.js";
 import { sha256 } from "./Build.js";
-import { TckError, type Bundle, type RuntimeHandle } from "./Domain.js";
+import {
+  TckError,
+  toTckError,
+  type Bundle,
+  type RuntimeHandle,
+} from "./Domain.js";
 import { Processes } from "./Processes.js";
 import { cleanupAll, owned } from "./Resources.js";
 import { inspectService, mcCat, publishedPort, toolDeploy } from "./Compose.js";
@@ -30,7 +35,12 @@ export type LocalOptions = {
   bundle: Bundle;
   cleanupError: (detail: string) => Effect.Effect<void>;
 } & (
-  | { topology: "single"; durability?: "bucket"; qualification?: false }
+  | {
+      topology: "single";
+      durability?: "bucket";
+      qualification?: false;
+      deploymentChecks?: boolean;
+    }
   | {
       topology: "cluster";
       nodeCount: 2 | 3;
@@ -52,6 +62,8 @@ export const acquireLocal = (options: LocalOptions) =>
     const nodeCount = options.topology === "cluster" ? options.nodeCount : 2;
     const durability = options.durability ?? "bucket";
     const qualification = options.qualification ?? false;
+    const wantsDeploymentChecks =
+      options.topology === "single" && (options.deploymentChecks ?? false);
     const processes = yield* Processes;
     const artifacts = yield* Artifacts;
     const fs = yield* FileSystem.FileSystem;
@@ -157,7 +169,7 @@ export const acquireLocal = (options: LocalOptions) =>
           "--json",
         ]);
         yield* artifacts.text("diagnose.jsonl", diagnosis.stdout);
-        const deploymentChecks = runId.endsWith("-core")
+        const deploymentChecks = wantsDeploymentChecks
           ? yield* checkDeployment(bundle, compose)
           : [];
         const deployed = yield* toolDeploy(compose, "/fixture", {
@@ -319,14 +331,7 @@ export const acquireLocal = (options: LocalOptions) =>
                     times: 10,
                   }),
                   Effect.timeout("30 seconds"),
-                  Effect.mapError((error) =>
-                    error instanceof TckError
-                      ? error
-                      : new TckError({
-                          phase: "lifecycle",
-                          message: String(error),
-                        }),
-                  ),
+                  Effect.mapError(toTckError("lifecycle")),
                 );
               }),
             prepareRestart: () =>

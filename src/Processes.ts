@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { Artifacts } from "./Artifacts.js";
-import { TckError } from "./Domain.js";
+import { TckError, toTckError } from "./Domain.js";
 
 export class Processes extends Context.Service<
   Processes,
@@ -73,11 +73,7 @@ export const processesLayer = Layer.effect(
           }),
         ).pipe(
           Effect.timeout("120 seconds"),
-          Effect.mapError((error) =>
-            error instanceof TckError
-              ? error
-              : new TckError({ phase: "process", message: String(error) }),
-          ),
+          Effect.mapError(toTckError("process")),
         ),
     };
   }),

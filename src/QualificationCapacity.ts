@@ -8,6 +8,7 @@ import {
 import type { Node } from "./FleetControls.js";
 import { runQueue } from "./QualificationDependencies.js";
 import { runSocketOrStream } from "./QualificationStreams.js";
+import { leaseLapse } from "./Domain.js";
 const largeRestore = (ctx: QualificationContext) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -21,7 +22,7 @@ const largeRestore = (ctx: QualificationContext) =>
         });
       const prior = (yield* ctx.owner()).node;
       yield* fleet.kill(prior);
-      yield* Effect.sleep("11 seconds");
+      yield* leaseLapse;
       yield* fleet.discard(prior);
       yield* ctx.start(prior);
       const started = Date.now();
@@ -140,7 +141,7 @@ const memoryPressure = (
         };
       }),
     );
-    yield* Effect.sleep("11 seconds");
+    yield* leaseLapse;
     yield* ctx.startAll();
     for (const node of constrained) {
       const restored = yield* fleet.resources(node);

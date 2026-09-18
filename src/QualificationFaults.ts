@@ -10,6 +10,7 @@ import {
   hasStorageFaultEvidence,
   StorageEvent,
 } from "./QualificationOracles.js";
+import { leaseLapse } from "./Domain.js";
 const runStorageFault = (id: string, ctx: QualificationContext) =>
   Effect.scoped(
     Effect.gen(function* () {
@@ -127,7 +128,7 @@ const peerPartition = (ctx: QualificationContext) =>
     // Reconnection restores the network; restart restores Docker's public port mapping.
     if ((yield* ctx.fleet.inspect(result.partitioned)).State.Running)
       yield* ctx.fleet.kill(result.partitioned);
-    yield* Effect.sleep("11 seconds");
+    yield* leaseLapse;
     yield* ctx.start(result.partitioned);
     for (const node of ctx.nodes) {
       ctx.targets[node] = yield* ctx.fleet.target(node);

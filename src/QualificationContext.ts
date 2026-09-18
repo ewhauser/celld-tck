@@ -2,7 +2,12 @@ import { waitForReady } from "./Polling.js";
 import { Effect, Schema } from "effect";
 import { pollUntil } from "./Polling.js";
 import { Artifacts } from "./Artifacts.js";
-import { attemptRequest, Transport, type Target } from "./Domain.js";
+import {
+  attemptRequest,
+  leaseLapse,
+  Transport,
+  type Target,
+} from "./Domain.js";
 import type { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
 import {
@@ -178,7 +183,7 @@ export const makeContext = (
     const crash = (node: Node) =>
       Effect.gen(function* () {
         yield* fleet.kill(node);
-        yield* Effect.sleep("11 seconds");
+        yield* leaseLapse;
         yield* start(node);
       });
     const startAll = () =>
@@ -190,7 +195,7 @@ export const makeContext = (
         for (const node of nodes)
           if ((yield* fleet.inspect(node)).State.Running)
             yield* fleet.kill(node);
-        yield* Effect.sleep("11 seconds");
+        yield* leaseLapse;
         yield* startAll();
       });
     const writeAcknowledged = (node: Node = "celld") =>

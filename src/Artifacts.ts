@@ -48,12 +48,16 @@ export const artifactsLayer = (directory: string) =>
     }),
   );
 
+export const decodeAs =
+  <S extends Schema.Constraint>(schema: S, phase: string) =>
+  (input: unknown) =>
+    Schema.decodeUnknownEffect(schema)(input).pipe(
+      Effect.mapError(
+        (error) => new TckError({ phase, message: String(error) }),
+      ),
+    );
+
 export const decodeJson = <S extends Schema.Constraint>(
   schema: S,
   input: string,
-) =>
-  Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(input).pipe(
-    Effect.mapError(
-      (error) => new TckError({ phase: "decode", message: String(error) }),
-    ),
-  );
+) => decodeAs(Schema.fromJsonString(schema), "decode")(input);

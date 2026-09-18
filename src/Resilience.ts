@@ -1,7 +1,12 @@
 import { readEventually, retryRead, pendingPhase } from "./Polling.js";
 import { Effect, Exit, Fiber, Schema } from "effect";
 import { Artifacts } from "./Artifacts.js";
-import { attemptRequest, TckError, type Observation } from "./Domain.js";
+import {
+  attemptRequest,
+  leaseLapse,
+  TckError,
+  type Observation,
+} from "./Domain.js";
 import { type Node, type fleetControls } from "./FleetControls.js";
 import { equal } from "./Oracle.js";
 import {
@@ -105,7 +110,7 @@ export const resilienceStages = (ctx: ResilienceContext) =>
       Effect.gen(function* () {
         const leader = (yield* fleet.owner(ctx.cell())).node;
         yield* fleet.kill(leader);
-        yield* Effect.sleep("11 seconds");
+        yield* leaseLapse;
         yield* ctx.start(leader);
         yield* ctx.ready(leader);
         yield* ctx.write(leader, id);
@@ -126,7 +131,7 @@ export const resilienceStages = (ctx: ResilienceContext) =>
           const prior = yield* fleet.owner(ctx.cell());
           const successor = others(prior.node)[0]!;
           yield* fleet.pause(prior.node);
-          yield* Effect.sleep("11 seconds");
+          yield* leaseLapse;
           yield* readable(successor);
           yield* ctx.check(successor);
           const next = yield* fleet.owner(ctx.cell());
@@ -189,7 +194,7 @@ export const resilienceStages = (ctx: ResilienceContext) =>
               outcomes.some((outcome) => !outcome.acknowledged),
               true,
             );
-            yield* Effect.sleep("11 seconds");
+            yield* leaseLapse;
             const recovered = yield* readable(successor);
             yield* artifacts.json("interrupted-write-state.json", recovered);
             yield* checkOutageState(recovered, [
@@ -212,7 +217,7 @@ export const resilienceStages = (ctx: ResilienceContext) =>
           yield* Effect.all(nodes.map(fleet.kill), {
             concurrency: "unbounded",
           });
-          yield* Effect.sleep("11 seconds");
+          yield* leaseLapse;
           yield* Effect.all(nodes.map(ctx.start), { concurrency: "unbounded" });
           for (const node of nodes) yield* ctx.ready(node);
           yield* checkAll();
@@ -225,7 +230,7 @@ export const resilienceStages = (ctx: ResilienceContext) =>
           const lost = others(leader)[0]!;
           const remaining = others(leader)[1]!;
           yield* fleet.kill(lost);
-          yield* Effect.sleep("11 seconds");
+          yield* leaseLapse;
           yield* ctx.write(leader, 141);
           yield* ensemble(leader, [remaining], false);
           yield* ctx.write(leader, 143);
@@ -234,7 +239,7 @@ export const resilienceStages = (ctx: ResilienceContext) =>
           yield* fleet.partition(leader);
           yield* ctx.write(leader, 142);
           yield* fleet.kill(leader);
-          yield* Effect.sleep("11 seconds");
+          yield* leaseLapse;
           yield* readable(remaining);
           yield* ctx.check(remaining);
           yield* fleet.reconnect(leader);
@@ -254,7 +259,7 @@ export const resilienceStages = (ctx: ResilienceContext) =>
           yield* Effect.all(nodes.map(fleet.kill), {
             concurrency: "unbounded",
           });
-          yield* Effect.sleep("11 seconds");
+          yield* leaseLapse;
           for (const node of nodes) yield* fleet.discard(node);
           yield* Effect.all(nodes.map(ctx.start), { concurrency: "unbounded" });
           // Losing all durable copies exceeds RPO=0. Only full recovery or explicit refusal/loss reporting is acceptable.
