@@ -80,3 +80,7 @@ Finalizers collect logs and remove owned Docker resources on success, failure, a
 Add cases in `src/CoreCases.ts`, `ServiceCases.ts`, `NodeCases.ts`, or `ExtensionCases.ts`; add their IDs to `docs/coverage.json`. Assertions belong in the driver. Fixtures perform platform operations and expose observations. Keep unknown-data validation at boundaries, use Effect services and scopes, and adapt Promise APIs only at their platform boundary. See [AGENTS.md](AGENTS.md) and [docs/DESIGN.md](docs/DESIGN.md).
 
 Only `local` and `reference` environment adapters are implemented. The same semantic cases can be reused by future S3/attached-AWS adapters; no AWS execution or provisioning is claimed here.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE).
