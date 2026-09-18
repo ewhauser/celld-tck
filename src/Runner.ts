@@ -1,11 +1,10 @@
 import { waitForReady } from "./Polling.js";
 import { Console, Effect, FileSystem, Schema } from "effect";
 import { resolve } from "node:path";
-import { Artifacts, artifactsLayer } from "./Artifacts.js";
+import { Artifacts, artifactsLayer, decodeJson } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
 import { cases, suites, type Suite } from "./Catalog.js";
 import { Coverage, validateCoverage } from "./Coverage.js";
-import { decodeJson } from "./Artifacts.js";
 import {
   ApiEnvironment,
   Transport,

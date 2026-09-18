@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect";
 import { gunzipSync, inflateSync } from "node:zlib";
 import { TckError } from "./Domain.js";
 import { decodeAs } from "./Artifacts.js";
+import { endpoint } from "./CoreCases.js";
 import { equal } from "./Oracle.js";
 
 export const checkCompression = (value: unknown) =>
@@ -44,7 +45,6 @@ export const checkCompression = (value: unknown) =>
       yield* equal(decoded, "hello λ");
     }
   });
-import { endpoint } from "./CoreCases.js";
 export const nodeCases = [
   endpoint(
     "node.buffer",

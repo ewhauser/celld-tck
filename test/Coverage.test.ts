@@ -1,10 +1,9 @@
 import { expect, it } from "@effect/vitest";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, FileSystem } from "effect";
 import { cases } from "../src/Catalog.js";
 import { validateCoverage, Coverage } from "../src/Coverage.js";
 import { decodeJson } from "../src/Artifacts.js";
 import { NodeServices } from "@effect/platform-node";
-import { FileSystem } from "effect";
 import { selectCases } from "../src/Runner.js";
 it.effect("requires every declared case exactly once", () =>
   Effect.gen(function* () {

@@ -1,6 +1,10 @@
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { checkHandoff } from "../src/Multinode.js";
+import {
+  checkHandoff,
+  hasFleetProof,
+  hasLogRecovery,
+} from "../src/Multinode.js";
 it.effect("failover requires the successor and a strictly newer epoch", () =>
   Effect.gen(function* () {
     const before = { node: "celld" as const, epoch: 3 };
@@ -16,7 +20,6 @@ it.effect("failover requires the successor and a strictly newer epoch", () =>
   }),
 );
 
-import { hasFleetProof, hasLogRecovery } from "../src/Multinode.js";
 it.effect(
   "fleet evidence requires the tested cell and a nonempty recovery for the dead node",
   () =>
