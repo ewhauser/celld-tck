@@ -170,8 +170,7 @@ export const runSocketOrStream = (id: string, ctx: QualificationContext) =>
           id === "capacity.slow-consumer",
         true,
       );
-      for (let i = 0; i < 128; i++)
-        yield* ctx.write().pipe(Effect.flatMap((ack) => equal(ack, true)));
+      for (let i = 0; i < 128; i++) yield* ctx.writeAcknowledged();
       const expected = (yield* ctx.state()).map(({ kv: _, ...row }) => row);
       if (id === "capacity.slow-consumer") {
         const started = Date.now();

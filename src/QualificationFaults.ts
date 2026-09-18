@@ -13,7 +13,7 @@ import {
 const runStorageFault = (id: string, ctx: QualificationContext) =>
   Effect.scoped(
     Effect.gen(function* () {
-      const { fleet, nodes, artifacts } = ctx;
+      const { artifacts } = ctx;
 
       yield* acknowledgedBatch(ctx, 12);
       const mode =
@@ -39,14 +39,7 @@ const runStorageFault = (id: string, ctx: QualificationContext) =>
         hasStorageFaultEvidence(observed.events, mode, ctx.identity.cell),
         true,
       );
-      for (const node of nodes) {
-        if ((yield* fleet.inspect(node)).State.Running) yield* fleet.kill(node);
-      }
-      yield* Effect.sleep("11 seconds");
-      yield* Effect.forEach(nodes, ctx.start, {
-        concurrency: "unbounded",
-        discard: true,
-      });
+      yield* ctx.restartAll();
       yield* acknowledgedBatch(ctx, 4);
       return yield* ctx.verify();
     }),

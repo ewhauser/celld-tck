@@ -49,10 +49,7 @@ export const runQueue = (
           delaySeconds: 15,
         });
         yield* Effect.sleep("16 seconds");
-        yield* Effect.forEach(nodes, ctx.start, {
-          concurrency: "unbounded",
-          discard: true,
-        });
+        yield* ctx.startAll();
       }
       const observed = yield* ctx.poll(
         events(ctx),
@@ -70,8 +67,6 @@ export const runQueue = (
 const runWorkflow = (ctx: QualificationContext) =>
   Effect.scoped(
     Effect.gen(function* () {
-      const { fleet, nodes } = ctx;
-
       yield* ctx.json("/flow/start", "celld", "POST");
       yield* ctx.poll(events(ctx), (items) =>
         items.some(([key]) => key === "event:flow-first"),
@@ -84,12 +79,7 @@ const runWorkflow = (ctx: QualificationContext) =>
           "status" in value &&
           value.status === "waiting",
       );
-      for (const node of nodes) yield* fleet.kill(node);
-      yield* Effect.sleep("11 seconds");
-      yield* Effect.forEach(nodes, ctx.start, {
-        concurrency: "unbounded",
-        discard: true,
-      });
+      yield* ctx.restartAll();
       yield* equal(yield* events(ctx), [["event:flow-first", 1]]);
       yield* ctx.json("/flow/continue", "celld", "POST");
       const status = yield* ctx.poll(

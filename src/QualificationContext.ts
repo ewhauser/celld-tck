@@ -181,6 +181,20 @@ export const makeContext = (
         yield* Effect.sleep("11 seconds");
         yield* start(node);
       });
+    const startAll = () =>
+      Effect.forEach(nodes, start, { concurrency: "unbounded", discard: true });
+    // Fault scenarios may already have lost nodes; stop whatever survived,
+    // let every lease lapse, then bring the whole fleet back together.
+    const restartAll = () =>
+      Effect.gen(function* () {
+        for (const node of nodes)
+          if ((yield* fleet.inspect(node)).State.Running)
+            yield* fleet.kill(node);
+        yield* Effect.sleep("11 seconds");
+        yield* startAll();
+      });
+    const writeAcknowledged = (node: Node = "celld") =>
+      write(node).pipe(Effect.flatMap((ack) => equal(ack, true)));
     const poll = <A>(
       effect: Effect.Effect<A, unknown>,
       done: (a: A) => boolean,
@@ -210,9 +224,12 @@ export const makeContext = (
       owner,
       ledger,
       write,
+      writeAcknowledged,
       state,
       verify,
       start,
+      startAll,
+      restartAll,
       crash,
       ready,
       poll,
@@ -235,10 +252,7 @@ export const events = (ctx: QualificationContext) =>
 export const acknowledgedBatch = (ctx: QualificationContext, count: number) =>
   Effect.forEach(
     Array.from({ length: count }),
-    (_, i) =>
-      ctx
-        .write(ctx.nodes[i % 3]!)
-        .pipe(Effect.flatMap((ack) => equal(ack, true))),
+    (_, i) => ctx.writeAcknowledged(ctx.nodes[i % 3]!),
     { concurrency: 4, discard: true },
   );
 export const traffic = (ctx: QualificationContext, count: number) =>
