@@ -30,7 +30,12 @@ export type LocalOptions = {
   bundle: Bundle;
   cleanupError: (detail: string) => Effect.Effect<void>;
 } & (
-  | { topology: "single"; durability?: "bucket"; qualification?: false }
+  | {
+      topology: "single";
+      durability?: "bucket";
+      qualification?: false;
+      deploymentChecks?: boolean;
+    }
   | {
       topology: "cluster";
       nodeCount: 2 | 3;
@@ -52,6 +57,8 @@ export const acquireLocal = (options: LocalOptions) =>
     const nodeCount = options.topology === "cluster" ? options.nodeCount : 2;
     const durability = options.durability ?? "bucket";
     const qualification = options.qualification ?? false;
+    const wantsDeploymentChecks =
+      options.topology === "single" && (options.deploymentChecks ?? false);
     const processes = yield* Processes;
     const artifacts = yield* Artifacts;
     const fs = yield* FileSystem.FileSystem;
@@ -157,7 +164,7 @@ export const acquireLocal = (options: LocalOptions) =>
           "--json",
         ]);
         yield* artifacts.text("diagnose.jsonl", diagnosis.stdout);
-        const deploymentChecks = runId.endsWith("-core")
+        const deploymentChecks = wantsDeploymentChecks
           ? yield* checkDeployment(bundle, compose)
           : [];
         const deployed = yield* toolDeploy(compose, "/fixture", {

@@ -151,6 +151,7 @@ export const runSuite = (options: RunOptions) =>
                   bundle,
                   cleanupError: executor.cleanupError,
                   topology: "single",
+                  deploymentChecks: fixture === "core",
                 })
               : acquireReference("candidate", bundle, executor.cleanupError);
             groupEnvironment.candidate = candidate.metadata;
