@@ -1,16 +1,7 @@
-import {
-  Cause,
-  Console,
-  Effect,
-  Exit,
-  Fiber,
-  FileSystem,
-  Schedule,
-  Schema,
-} from "effect";
+import { Effect, Exit, Fiber, FileSystem, Schedule, Schema } from "effect";
 import { Artifacts, artifactsLayer } from "./Artifacts.js";
 import { buildFixtureFor, sha256 } from "./Build.js";
-import { Transport, TckError, type CaseResult, type Target } from "./Domain.js";
+import { Transport, TckError, type Target } from "./Domain.js";
 import { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
 import { Processes } from "./Processes.js";
@@ -21,7 +12,7 @@ import {
   hasStorageFaultEvidence,
   StorageEvent,
 } from "./QualificationOracles.js";
-import { withLifecycleReport } from "./LifecycleReport.js";
+import { makeSuiteExecutor } from "./SuiteExecutor.js";
 import {
   checkFencedReceipts,
   checkHistory,
@@ -801,37 +792,31 @@ export const runQualification = (options: {
         }),
       );
     const artifacts = yield* Artifacts;
-    const startedAt = new Date().toISOString();
-    const cases: CaseResult[] = ids.map((id) => ({
-      id,
-      status: "infrastructure-error",
-      durationMs: 0,
-      error: "Case not reached",
-    }));
-    const errors: string[] = [];
     const environment = {
       suite: options.suite,
       reference: "none; fault invariants",
       candidates: [] as unknown[],
     };
+    const executor = yield* makeSuiteExecutor({
+      ...options,
+      profile: "local",
+      ids,
+      environment,
+    });
     const work = Effect.gen(function* () {
       Object.assign(environment, yield* provenance);
       yield* artifacts.json("run.json", { ...options, selected: ids });
-      for (const [index, id] of ids.entries()) {
-        let setupDone = false;
-        const start = Date.now();
-        const outcome = yield* Effect.exit(
-          Effect.scoped(
+      for (const id of ids) {
+        yield* executor.runCase(
+          id,
+          (test) =>
             Effect.gen(function* () {
               const bundle = yield* buildFixtureFor("qualification");
               // Bucket proofs for S3 fault cases ensure storage faults are on the acknowledgment path.
               const runtime = yield* acquireLocal(
                 `${options.runId}-${id.replaceAll(".", "-")}`,
                 bundle,
-                (detail) =>
-                  Effect.sync(() => {
-                    errors.push(detail);
-                  }),
+                executor.cleanupError,
                 true,
                 id.startsWith("faults.storage-") ? "bucket" : "fleet",
                 3,
@@ -843,7 +828,7 @@ export const runQualification = (options: {
                 id.replaceAll(".", "-") + "-" + options.runId.slice(4, 12),
                 options.seed,
               );
-              setupDone = true;
+              yield* test.ready;
               const result = yield* runCase(id, ctx);
               if (id.startsWith("traffic."))
                 yield* auditLedger({
@@ -924,43 +909,12 @@ export const runQualification = (options: {
                 }
               }
               return result;
-            }),
-          ).pipe(
-            Effect.provide(artifactsLayer(`${artifacts.directory}/${id}`)),
-            Effect.timeout("8 minutes"),
-          ),
+            }).pipe(
+              Effect.provide(artifactsLayer(`${artifacts.directory}/${id}`)),
+            ),
+          { timeout: "8 minutes", includesSetup: true },
         );
-        const result: CaseResult = {
-          id,
-          status: Exit.isSuccess(outcome)
-            ? "pass"
-            : setupDone
-              ? "fail"
-              : "infrastructure-error",
-          durationMs: Date.now() - start,
-          ...(Exit.isSuccess(outcome)
-            ? { candidate: outcome.value }
-            : { error: Cause.pretty(outcome.cause) }),
-        };
-        cases[index] = result;
-        yield* artifacts.json(`case-${id}.json`, result);
-        yield* Console.log(`${result.status.toUpperCase()} ${id}`);
-        if (Exit.isFailure(outcome) && Cause.hasInterrupts(outcome.cause))
-          return yield* Effect.failCause(outcome.cause);
       }
     });
-    yield* withLifecycleReport(
-      work,
-      {
-        schemaVersion: 1,
-        runId: options.runId,
-        profile: "local",
-        seed: options.seed,
-        startedAt,
-        environment,
-        cases,
-        errors,
-      },
-      errors,
-    );
+    yield* executor.execute(work);
   });

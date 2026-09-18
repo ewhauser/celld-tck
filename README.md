@@ -103,6 +103,8 @@ pnpm test:local
 
 Add API cases in `src/CoreCases.ts`, `src/ServiceCases.ts`, `src/NodeCases.ts`, or `src/ExtensionCases.ts`, and register their IDs in `docs/coverage.json`. Keep fixtures identical across runtimes: fixtures perform operations and return observations; the driver owns assertions.
 
+The four runners share `src/SuiteExecutor.ts` for case results, deadlines, cleanup diagnostics, and JSON/JUnit reporting. Runners retain selection, provisioning, and scenario sequencing. Use `record` for results already classified by the API oracle and `runCase` for lifecycle scenarios; scenarios that include provisioning mark `ready` after setup succeeds. Dependent stages stop on failure, while independent cases can continue. Only the API suite accepts reviewed divergences and known bugs. Reports are finalized after resource cleanup, including on cancellation, and all suites include status counts and placeholders for unreached cases. Executor changes should extend `test/SuiteExecutor.test.ts` and run the affected runtime suites.
+
 See [AGENTS.md](AGENTS.md) for implementation conventions and [the design document](docs/DESIGN.md) for the harness architecture.
 
 ## Further reading

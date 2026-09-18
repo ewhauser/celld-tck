@@ -1,12 +1,4 @@
-import {
-  Cause,
-  Console,
-  Effect,
-  Exit,
-  FileSystem,
-  Schedule,
-  Schema,
-} from "effect";
+import { Console, Effect, FileSystem, Schedule, Schema } from "effect";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { Artifacts, artifactsLayer } from "./Artifacts.js";
@@ -15,7 +7,6 @@ import { cases, suites, type Suite } from "./Catalog.js";
 import { Coverage, validateCoverage } from "./Coverage.js";
 import { decodeJson } from "./Artifacts.js";
 import {
-  Report,
   ApiEnvironment,
   Transport,
   TckError,
@@ -29,7 +20,7 @@ import { acquireLocal } from "./Local.js";
 import { equal, evaluate } from "./Oracle.js";
 import { acquireReference } from "./Reference.js";
 import { BugRegistry, validateBugRegistry } from "./KnownBugs.js";
-import { junit } from "./Report.js";
+import { makeSuiteExecutor } from "./SuiteExecutor.js";
 
 export interface RunOptions {
   readonly runId: string;
@@ -102,13 +93,6 @@ export const runSuite = (options: RunOptions) =>
         .filter((test) => test.divergence)
         .map((test) => ({ id: test.id, ...test.divergence, check: undefined })),
     });
-    const startedAt = new Date().toISOString();
-    const results: CaseResult[] = selected.map((test) => ({
-      id: test.id,
-      status: "infrastructure-error",
-      durationMs: 0,
-      error: "Case not reached",
-    }));
     const deploymentIds =
       options.profile === "local" &&
       selected.some((test) => (test.fixture ?? "core") === "core")
@@ -117,16 +101,6 @@ export const runSuite = (options: RunOptions) =>
             ...rejectionConfigs.map((test) => test.id),
           ]
         : [];
-    results.push(
-      ...deploymentIds.map((id) => ({
-        id,
-        status: "infrastructure-error" as const,
-        durationMs: 0,
-        error: "Case not reached",
-      })),
-    );
-    const errors: string[] = [];
-    let executionCompleted = false;
     const require = createRequire(import.meta.url);
     const environment: Record<string, unknown> = {
       hostNode: process.version,
@@ -138,189 +112,106 @@ export const runSuite = (options: RunOptions) =>
       esbuild: require("esbuild/package.json").version,
       referenceOnly: options.profile === "reference",
     };
-    const cleanupError = (detail: string) =>
-      Effect.sync(() => {
-        errors.push(`Cleanup: ${detail}`);
+    const executor = yield* makeSuiteExecutor({
+      ...options,
+      ids: [...selected.map((test) => test.id), ...deploymentIds],
+      environment,
+      policy: "compatibility",
+      timeout: "10 minutes",
+    });
+    const work = Effect.gen(function* () {
+      const processes = yield* Processes;
+      const revision = yield* processes.run("git", ["rev-parse", "HEAD"]).pipe(
+        Effect.map((output) => output.stdout.trim()),
+        Effect.catch(() => Effect.succeed("unavailable")),
+      );
+      environment.sourceRevision = revision;
+      environment.dirty = yield* processes
+        .run("git", ["status", "--porcelain"])
+        .pipe(
+          Effect.map((output) => output.stdout.trim().length > 0),
+          Effect.catch(() => Effect.succeed(null)),
+        );
+      const lockfile = yield* fs.readFileString(
+        new URL("../pnpm-lock.yaml", import.meta.url).pathname,
+      );
+      environment.lockfileSha256 = sha256(lockfile);
+      yield* artifacts.json("run.json", {
+        ...options,
+        selected: selected.map((test) => ({
+          id: test.id,
+          contract: test.contract,
+        })),
       });
-    const work = Effect.scoped(
-      Effect.gen(function* () {
-        const processes = yield* Processes;
-        const revision = yield* processes
-          .run("git", ["rev-parse", "HEAD"])
-          .pipe(
-            Effect.map((output) => output.stdout.trim()),
-            Effect.catch(() => Effect.succeed("unavailable")),
-          );
-        environment.sourceRevision = revision;
-        environment.dirty = yield* processes
-          .run("git", ["status", "--porcelain"])
-          .pipe(
-            Effect.map((output) => output.stdout.trim().length > 0),
-            Effect.catch(() => Effect.succeed(null)),
-          );
-        const lockfile = yield* fs.readFileString(
-          new URL("../pnpm-lock.yaml", import.meta.url).pathname,
-        );
-        environment.lockfileSha256 = sha256(lockfile);
-        yield* artifacts.json("run.json", {
-          ...options,
-          selected: selected.map((test) => ({
-            id: test.id,
-            contract: test.contract,
-          })),
-        });
-        yield* Console.log(
-          `Building Effect fixtures; profile=${options.profile}, seed=${options.seed}`,
-        );
-        for (const fixture of [
-          "core",
-          "node",
-          "extensions",
-          "repro",
-        ] as const) {
-          if (!selected.some((test) => (test.fixture ?? "core") === fixture))
-            continue;
-          yield* Effect.scoped(
-            Effect.gen(function* () {
-              const artifacts = yield* Artifacts;
-              const bundle = yield* buildFixtureFor(fixture);
-              const groupEnvironment: Record<string, unknown> = {
-                fixtureSha256: bundle.sha256,
-                compatibilityDate: bundle.compatibilityDate,
-                compatibilityFlags: bundle.config.compatibility_flags,
-              };
-              (environment.fixtures as Record<string, unknown>)[fixture] =
-                groupEnvironment;
-              const reference = yield* acquireReference(
-                "reference",
-                bundle,
-                cleanupError,
+      yield* Console.log(
+        `Building Effect fixtures; profile=${options.profile}, seed=${options.seed}`,
+      );
+      for (const fixture of ["core", "node", "extensions", "repro"] as const) {
+        if (!selected.some((test) => (test.fixture ?? "core") === fixture))
+          continue;
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const bundle = yield* buildFixtureFor(fixture);
+            const groupEnvironment: Record<string, unknown> = {
+              fixtureSha256: bundle.sha256,
+              compatibilityDate: bundle.compatibilityDate,
+              compatibilityFlags: bundle.config.compatibility_flags,
+            };
+            (environment.fixtures as Record<string, unknown>)[fixture] =
+              groupEnvironment;
+            const reference = yield* acquireReference(
+              "reference",
+              bundle,
+              executor.cleanupError,
+            );
+            groupEnvironment.reference = reference.metadata;
+            yield* ready(reference.target, options.runId);
+            yield* Console.log(
+              `Reference ready. Starting ${options.profile === "local" ? "celld + MinIO" : "second isolated workerd"}...`,
+            );
+            const candidate = yield* options.profile === "local"
+              ? acquireLocal(
+                  `${options.runId}-${fixture}`,
+                  bundle,
+                  executor.cleanupError,
+                )
+              : acquireReference("candidate", bundle, executor.cleanupError);
+            groupEnvironment.candidate = candidate.metadata;
+            if (options.profile === "local" && fixture === "core") {
+              const deploymentResults = yield* Schema.decodeUnknownEffect(
+                Schema.Array(CaseResult),
+              )(candidate.metadata.deploymentChecks);
+              yield* equal(
+                deploymentResults.map((result) => result.id),
+                deploymentIds,
               );
-              groupEnvironment.reference = reference.metadata;
-              yield* ready(reference.target, options.runId);
-              yield* Console.log(
-                `Reference ready. Starting ${options.profile === "local" ? "celld + MinIO" : "second isolated workerd"}...`,
+              for (const result of deploymentResults)
+                yield* executor.record(result);
+            }
+            yield* ready(candidate.target, options.runId);
+            for (const test of selected) {
+              if ((test.fixture ?? "core") !== fixture) continue;
+              const result = yield* evaluate(
+                test,
+                reference.target,
+                candidate.target,
+                {
+                  namespace: `${options.runId}-${test.id.replaceAll(".", "-")}`,
+                  seed: options.seed,
+                  compatibilityDate: bundle.compatibilityDate,
+                  compatibilityFlags: bundle.config.compatibility_flags,
+                },
+                bugs.expectations.find((entry) => entry.caseId === test.id),
+                options.knownBugs,
               );
-              const candidate = yield* options.profile === "local"
-                ? acquireLocal(
-                    `${options.runId}-${fixture}`,
-                    bundle,
-                    cleanupError,
-                  )
-                : acquireReference("candidate", bundle, cleanupError);
-              groupEnvironment.candidate = candidate.metadata;
-              if (options.profile === "local" && fixture === "core") {
-                const deploymentResults = yield* Schema.decodeUnknownEffect(
-                  Schema.Array(CaseResult),
-                )(candidate.metadata.deploymentChecks);
-                yield* equal(
-                  deploymentResults.map((result) => result.id),
-                  deploymentIds,
-                );
-                for (const result of deploymentResults)
-                  results[
-                    results.findIndex((existing) => existing.id === result.id)
-                  ] = result;
-                for (const result of deploymentResults)
-                  yield* Console.log(
-                    `${result.status.toUpperCase()} ${result.id}`,
-                  );
-              }
-              yield* ready(candidate.target, options.runId);
-              for (const [index, test] of selected.entries()) {
-                if ((test.fixture ?? "core") !== fixture) continue;
-                const result = yield* evaluate(
-                  test,
-                  reference.target,
-                  candidate.target,
-                  {
-                    namespace: `${options.runId}-${test.id.replaceAll(".", "-")}`,
-                    seed: options.seed,
-                    compatibilityDate: bundle.compatibilityDate,
-                    compatibilityFlags: bundle.config.compatibility_flags,
-                  },
-                  bugs.expectations.find((entry) => entry.caseId === test.id),
-                  options.knownBugs,
-                );
-                results[index] = result;
-                yield* artifacts.json(`case-${test.id}.json`, result);
-                yield* Console.log(
-                  `${result.status.toUpperCase()} ${result.id}`,
-                );
-              }
-            }),
-          ).pipe(
-            Effect.provide(
-              artifactsLayer(resolve(artifacts.directory, fixture)),
-            ),
-          );
-        }
-      }),
-    ).pipe(
-      Effect.timeout("10 minutes"),
-      Effect.andThen(() => {
-        executionCompleted = true;
-        if (
-          errors.length ||
-          results.some(
-            (result) =>
-              result.status !== "pass" &&
-              result.status !== "divergence" &&
-              result.status !== "known-bug",
-          )
-        )
-          return Effect.fail(
-            new TckError({
-              phase: "suite",
-              message: "Compatibility run failed; inspect the evidence bundle.",
-            }),
-          );
-        return Effect.void;
-      }),
-    );
-    yield* work.pipe(
-      Effect.onExit((exit) =>
-        Effect.gen(function* () {
-          if (Exit.isFailure(exit) && !executionCompleted)
-            errors.push(Cause.pretty(exit.cause));
-          const report = yield* Schema.decodeUnknownEffect(Report)({
-            schemaVersion: 1,
-            runId: options.runId,
-            profile: options.profile,
-            seed: options.seed,
-            startedAt,
-            completedAt: new Date().toISOString(),
-            environment:
-              yield* Schema.decodeUnknownEffect(ApiEnvironment)(environment),
-            cases: results,
-            counts: Object.fromEntries(
-              [
-                "pass",
-                "fail",
-                "divergence",
-                "known-bug",
-                "reference-error",
-                "infrastructure-error",
-              ].map((status) => [
-                status,
-                results.filter((result) => result.status === status).length,
-              ]),
-            ),
-            errors,
-            success:
-              Exit.isSuccess(exit) &&
-              errors.length === 0 &&
-              results.every(
-                (result) =>
-                  result.status === "pass" ||
-                  result.status === "divergence" ||
-                  result.status === "known-bug",
-              ),
-          });
-          yield* artifacts.json("report.json", report);
-          yield* artifacts.text("junit.xml", junit(report));
-          yield* Console.log(`Evidence: ${artifacts.directory}/report.json`);
-        }).pipe(Effect.orDie),
-      ),
-    );
+              yield* executor.record(result);
+            }
+          }),
+        ).pipe(
+          Effect.provide(artifactsLayer(resolve(artifacts.directory, fixture))),
+        );
+      }
+      yield* Schema.decodeUnknownEffect(ApiEnvironment)(environment);
+    });
+    yield* executor.execute(work);
   });

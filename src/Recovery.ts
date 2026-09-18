@@ -1,12 +1,12 @@
-import { Cause, Console, Effect, Exit, Schedule, Schema } from "effect";
+import { Effect, Schedule, Schema } from "effect";
 import { provenance } from "./Provenance.js";
 import { Artifacts } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
-import { Transport, TckError, type CaseResult, type Target } from "./Domain.js";
+import { Transport, TckError, type Target } from "./Domain.js";
 import { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
 import { runOutage } from "./Outage.js";
-import { withLifecycleReport } from "./LifecycleReport.js";
+import { makeSuiteExecutor } from "./SuiteExecutor.js";
 
 export const recoveryIds = [
   "recovery.graceful",
@@ -71,65 +71,61 @@ export const runRecovery = (options: {
       );
     const artifacts = yield* Artifacts;
     const transport = yield* Transport;
-    const startedAt = new Date().toISOString();
-    const results: CaseResult[] = ids.map((id) => ({
-      id,
-      status: "infrastructure-error",
-      durationMs: 0,
-      error: "Case not reached",
-    }));
-    const errors: string[] = [];
     const environment: Record<string, unknown> = {
       suite: "recovery",
       reference: "none; lifecycle invariants",
       localDiskRetained: !ids.includes("recovery.disk-loss"),
     };
-    yield* artifacts.json("run.json", {
+    const executor = yield* makeSuiteExecutor({
       ...options,
-      suite: "recovery",
-      selected: ids,
+      profile: "local",
+      ids,
+      environment,
+      timeout: "8 minutes",
     });
-    const work = Effect.scoped(
-      Effect.gen(function* () {
-        Object.assign(environment, yield* provenance);
-        const bundle = yield* buildFixtureFor("recovery");
-        environment.fixtureSha256 = bundle.sha256;
-        const runtime = yield* acquireLocal(
-          `${options.runId}-recovery`,
-          bundle,
-          (detail) =>
-            Effect.sync(() => {
-              errors.push(detail);
-            }),
-        );
-        environment.candidate = runtime.metadata;
-        const lifecycle = runtime.lifecycle;
-        let target: Target = runtime.target;
-        const request = (
-          path: string,
-          name: string,
-          method: "GET" | "POST" = "GET",
-        ) =>
-          transport
-            .request(target, { path: `${path}?name=${name}`, method })
-            .pipe(
-              Effect.tap((value) => equal(value.status, 200)),
-              Effect.map((value) => value.body),
-            );
-        const ready = () =>
-          request("/ready", "readiness").pipe(
-            Effect.flatMap((value) => equal(value, { ready: true })),
-            Effect.retry({
-              schedule: Schedule.spaced("500 millis"),
-              times: 90,
-            }),
-            Effect.timeout("60 seconds"),
+    const work = Effect.gen(function* () {
+      yield* artifacts.json("run.json", {
+        ...options,
+        suite: "recovery",
+        selected: ids,
+      });
+      Object.assign(environment, yield* provenance);
+      const bundle = yield* buildFixtureFor("recovery");
+      environment.fixtureSha256 = bundle.sha256;
+      const runtime = yield* acquireLocal(
+        `${options.runId}-recovery`,
+        bundle,
+        executor.cleanupError,
+      );
+      environment.candidate = runtime.metadata;
+      const lifecycle = runtime.lifecycle;
+      let target: Target = runtime.target;
+      const request = (
+        path: string,
+        name: string,
+        method: "GET" | "POST" = "GET",
+      ) =>
+        transport
+          .request(target, { path: `${path}?name=${name}`, method })
+          .pipe(
+            Effect.tap((value) => equal(value.status, 200)),
+            Effect.map((value) => value.body),
           );
-        yield* ready();
-        for (const [index, id] of ids.entries()) {
-          const start = Date.now();
-          const name = `${options.runId}-${id.replaceAll(".", "-")}`;
-          const attempt = yield* Effect.exit(
+      const ready = () =>
+        request("/ready", "readiness").pipe(
+          Effect.flatMap((value) => equal(value, { ready: true })),
+          Effect.retry({
+            schedule: Schedule.spaced("500 millis"),
+            times: 90,
+          }),
+          Effect.timeout("60 seconds"),
+        );
+      yield* ready();
+      for (const id of ids) {
+        const name = `${options.runId}-${id.replaceAll(".", "-")}`;
+        const result = yield* executor.runCase(
+          id,
+          () =>
             Effect.gen(function* () {
               if (id === "recovery.storage-outage") {
                 const recovered = yield* runOutage(target, name, lifecycle);
@@ -209,44 +205,15 @@ export const runRecovery = (options: {
               });
               yield* checkRecovered(seeded.activation, recovered, alarm);
               return recovered;
-            }).pipe(
-              Effect.timeout(
-                id === "recovery.storage-outage"
-                  ? "180 seconds"
-                  : "120 seconds",
-              ),
-            ),
-          );
-          if (Exit.isFailure(attempt) && Cause.hasInterrupts(attempt.cause))
-            return yield* Effect.failCause(attempt.cause);
-          const result: CaseResult = {
-            id,
-            status: Exit.isSuccess(attempt) ? "pass" : "fail",
-            durationMs: Date.now() - start,
-            ...(Exit.isSuccess(attempt)
-              ? { candidate: attempt.value }
-              : { error: Cause.pretty(attempt.cause) }),
-          };
-          results[index] = result;
-          yield* artifacts.json(`case-${id}.json`, result);
-          yield* Console.log(`${result.status.toUpperCase()} ${id}`);
-          // A failed lifecycle transition may leave the target down; do not cascade or retry mutations.
-          if (Exit.isFailure(attempt)) break;
-        }
-      }),
-    ).pipe(Effect.timeout("8 minutes"));
-    yield* withLifecycleReport(
-      work,
-      {
-        schemaVersion: 1,
-        runId: options.runId,
-        profile: "local",
-        seed: options.seed,
-        startedAt,
-        environment,
-        cases: results,
-        errors,
-      },
-      errors,
-    );
+            }),
+          {
+            timeout:
+              id === "recovery.storage-outage" ? "180 seconds" : "120 seconds",
+          },
+        );
+        // A failed lifecycle transition may leave the target down; do not cascade or retry mutations.
+        if (result.status !== "pass") break;
+      }
+    });
+    yield* executor.execute(work);
   });
