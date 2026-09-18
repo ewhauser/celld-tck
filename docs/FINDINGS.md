@@ -4,7 +4,7 @@ The suite compares pinned celld v0.5.0 with Miniflare 4.20260730.0 / workerd 1.2
 
 ## Current known-bug policy validation
 
-- `pnpm check`: formatting, three TypeScript projects, and 34 harness tests passed.
+- `pnpm check`: formatting, three TypeScript projects, and 35 harness tests passed.
 - Full local run: **65 passed, 2 divergences, 2 known bugs**, exit 0 (`tck-b3d376f9-1c06-49c1-8919-9f0cdf333d7b`).
 - Reference reproductions: **2 passed**, exit 0 (`tck-e1f63e03-89b2-4b67-a101-206498064bb0`).
 - Local reproductions: **2 known bugs**, exit 0 (`tck-7c0e3f3e-47bd-46ed-9a5f-a759e0d255e1`).
@@ -57,6 +57,10 @@ The separate [recovery suite](RECOVERY.md) passed graceful restart, SIGKILL reco
 ## Object-store outage
 
 The focused `recovery.storage-outage` case passed (`tck-e9c47cb1-60d3-4603-931b-a03ad803806a`). All three outage writes returned transport errors; logs recorded `node_lease_watchdog_fence`. The baseline transaction survived, none of the uncertain writes appeared in either store, and the post-recovery write survived a further SIGKILL/restart. The oracle also accepts fully committed uncertain writes, but never partial KV/SQL transactions. Both disks were retained. The full five-scenario suite also passed (`tck-7d20e9d9-54c2-4fdd-b884-8e074fed0830`), including the final check that previously observed state remains unchanged after a further crash.
+
+## Multi-node bucket durability
+
+All four stages passed (`tck-7bc94af3-ab2e-4887-a77d-498596e4179e`): cross-node routing, owner failover, old-owner rejoin, and storage-network partition with lease-watchdog fencing. Ownership records confirmed a new owner and higher epoch after each takeover. [MULTINODE.md](MULTINODE.md) describes the topology, recorded histories, and limits; fleet-durable follower-log recovery remains untested.
 
 ## Scope
 

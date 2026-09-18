@@ -17,7 +17,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm typecheck && pnpm test",
-    "test:recovery": "tsx src/main.ts --profile local --suite recovery"
+    "test:recovery": "tsx src/main.ts --profile local --suite recovery",
+    "test:multinode": "tsx src/main.ts --profile local --suite multinode"
   },
   "dependencies": {
     "jsonc-parser": "3.3.1",

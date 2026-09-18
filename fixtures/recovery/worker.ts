@@ -15,13 +15,15 @@ export class Recovery extends DurableObject<RecoveryEnv> {
   fetch(request: Request) {
     const storage = this.ctx.storage;
     const activation = this.activation;
+    const cell = this.ctx.id.toString();
     return Effect.runPromise(
       Effect.gen(function* () {
         const path = new URL(request.url).pathname;
         if (path === "/ready") return Response.json({ ready: true });
+        if (path === "/fleet/id") return Response.json({ cell });
         if (path === "/outage/write") {
           const id = Number(new URL(request.url).searchParams.get("id"));
-          if (!Number.isInteger(id) || id < 1 || id > 5)
+          if (!Number.isInteger(id) || id < 1 || id > 32)
             return new Response("invalid id", { status: 400 });
           yield* Effect.sync(() =>
             storage.transactionSync(() => {
