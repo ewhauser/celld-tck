@@ -4,6 +4,7 @@ import { deploymentIds } from "../DeploymentChecks.js";
 import { recoveryIds } from "../Recovery.js";
 import { multinodeIds } from "../Multinode.js";
 import { qualificationIds } from "../Qualification.js";
+import { qualificationGroups } from "../Suites.js";
 import type { CaseResult, Report } from "../Domain.js";
 
 export const Job = Schema.Struct({
@@ -63,14 +64,12 @@ export const definitions: readonly {
     group: "recovery",
     ids: multinodeIds("fleet", true),
   },
-  ...(["traffic", "dependencies", "faults", "capacity"] as const).map(
-    (key) => ({
-      key,
-      label: key[0]!.toUpperCase() + key.slice(1),
-      group: "qualification",
-      ids: qualificationIds.filter((id) => id.startsWith(key + ".")),
-    }),
-  ),
+  ...qualificationGroups.map((key) => ({
+    key,
+    label: key[0]!.toUpperCase() + key.slice(1),
+    group: "qualification",
+    ids: qualificationIds.filter((id) => id.startsWith(key + ".")),
+  })),
 ];
 export type Status =
   | CaseResult["status"]
