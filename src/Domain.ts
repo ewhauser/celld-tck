@@ -39,6 +39,22 @@ export class Transport extends Context.Service<
   }
 >()("tck/Transport") {}
 
+// Requests whose outcome must be classified rather than failed: a transport
+// failure is an uncertain result, every other TckError still propagates.
+export const attemptRequest = <A, R>(request: Effect.Effect<A, TckError, R>) =>
+  request.pipe(
+    Effect.map((response): { response: A } | { error: string } => ({
+      response,
+    })),
+    Effect.catch((error) =>
+      error.phase === "http"
+        ? Effect.succeed<{ response: A } | { error: string }>({
+            error: error.message,
+          })
+        : Effect.fail(error),
+    ),
+  );
+
 export interface CaseInput {
   readonly compatibilityDate?: string;
   readonly compatibilityFlags?: readonly string[];

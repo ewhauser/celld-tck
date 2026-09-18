@@ -3,7 +3,7 @@ import { Effect, Schema } from "effect";
 import { provenance } from "./Provenance.js";
 import { Artifacts } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
-import { Transport, TckError } from "./Domain.js";
+import { attemptRequest, Transport, TckError } from "./Domain.js";
 import { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
 import { OutageState, checkOutageState } from "./Outage.js";
@@ -274,17 +274,8 @@ export const runMultinode = (options: {
           const logs = yield* fleet.logs(isolated);
           yield* artifacts.text("partition-node.log", logs);
           yield* equal(logs.includes("node_lease_watchdog_fence"), true);
-          const refused = yield* request(
-            isolated,
-            "/outage/write?id=5",
-            "POST",
-          ).pipe(
-            Effect.map((response) => ({ response })),
-            Effect.catch((error) =>
-              error.phase === "http"
-                ? Effect.succeed({ error: error.message })
-                : Effect.fail(error),
-            ),
+          const refused = yield* attemptRequest(
+            request(isolated, "/outage/write?id=5", "POST"),
           );
           yield* artifacts.json("partition-refused-write.json", refused);
           if ("response" in refused)
