@@ -98,6 +98,19 @@ const alarm = (retry: boolean): TestCase => ({
 });
 export const coreCases: ReadonlyArray<TestCase> = [
   ...initialCases,
+  ep("storage.sync-committed", "/storage/sync-committed", {
+    retained: "durable λ",
+    removed: null,
+    rows: [{ id: 1, value: "committed" }],
+  }),
+  ep("sql.consumed-write-cursor", "/sql/consumed-write-cursor", {
+    returned: [{ n: 1 }, { n: 2 }, { n: 3 }],
+    rows: [{ n: 1 }, { n: 2 }, { n: 3 }],
+  }),
+  ep("sql.open-read-cursor", "/sql/open-read-cursor", {
+    first: { n: 1 },
+    remaining: [{ n: 2 }, { n: 3 }],
+  }),
   ep("http.fetch-abort", "/web/fetch-abort", { error: "AbortError" }),
   ep("storage.synchronous-kv", "/storage/synchronous-kv", {
     a: { value: 1 },

@@ -67,7 +67,12 @@ it.effect("keeps diagnostic reproductions outside the default corpus", () =>
   Effect.gen(function* () {
     const defaults = yield* selectCases("");
     const repros = yield* selectCases("", "repros");
-    expect(defaults).toHaveLength(63);
+    expect(defaults.map((test) => test.id).sort()).toEqual(
+      cases
+        .filter((test) => test.fixture !== "repro")
+        .map((test) => test.id)
+        .sort(),
+    );
     expect(defaults.every((test) => test.fixture !== "repro")).toBe(true);
     expect(repros.map((test) => test.id)).toEqual([
       "repro.body-readers",

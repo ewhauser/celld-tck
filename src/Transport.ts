@@ -86,7 +86,7 @@ export const transportLayer = Layer.effect(
               body,
             } satisfies Observation;
           }).pipe(
-            Effect.timeout("10 seconds"),
+            Effect.timeout(spec.timeoutMs ?? 10_000),
             Effect.tapCause((cause) =>
               artifacts.text(
                 "http.jsonl",

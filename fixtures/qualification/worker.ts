@@ -6,6 +6,7 @@ import {
   type WorkflowStep,
 } from "cloudflare:workers";
 import { Effect, Schema } from "effect";
+import { durabilityOperation } from "./Durability.js";
 const platform = <A>(f: () => PromiseLike<A>) =>
   Effect.tryPromise({ try: () => Promise.resolve(f()), catch: (e) => e });
 const blob = (id: number) => {
@@ -22,6 +23,7 @@ const blob = (id: number) => {
 const Write = Schema.Struct({ id: Schema.String, payload: Schema.String });
 export class Recovery extends DurableObject<QualificationEnv> {
   private readonly activation = crypto.randomUUID();
+  private durabilityCursor: ReturnType<SqlStorage["exec"]> | undefined;
   record(key: string) {
     return Effect.runPromise(
       Effect.sync(() => {
@@ -60,6 +62,21 @@ export class Recovery extends DurableObject<QualificationEnv> {
       Effect.gen({ self: this }, function* () {
         const url = new URL(request.url);
         const storage = this.ctx.storage;
+        const durability = yield* durabilityOperation(
+          this.ctx,
+          url.pathname,
+          (cursor) => {
+            this.durabilityCursor = cursor;
+          },
+          () =>
+            this.env.PROBE.getByName(
+              `${url.searchParams.get("name")}-witness`,
+            ).fetch("https://fixture.test/durability/witness-write"),
+        );
+        if (durability) {
+          void this.durabilityCursor;
+          return durability;
+        }
         if (url.pathname === "/ready") return Response.json({ ready: true });
         if (url.pathname === "/fleet/id")
           return Response.json({
@@ -297,7 +314,24 @@ export default {
           );
         if (url.pathname === "/service")
           return Response.json(yield* platform(() => env.SERVICE.echo(name)));
-        return yield* platform(() => env.PROBE.getByName(name).fetch(request));
+        return yield* platform(() =>
+          env.PROBE.getByName(name).fetch(request),
+        ).pipe(
+          Effect.catch((error) =>
+            url.pathname.startsWith("/durability/")
+              ? Effect.succeed(
+                  Response.json(
+                    {
+                      rejected: true,
+                      message:
+                        error instanceof Error ? error.message : String(error),
+                    },
+                    { status: 500 },
+                  ),
+                )
+              : Effect.fail(error),
+          ),
+        );
       }),
     );
   },

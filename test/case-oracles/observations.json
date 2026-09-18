@@ -13,6 +13,18 @@
     {
       "runId": "tck-d05ff807-0700-4ab6-816a-98e7021bb207",
       "sourceRevision": "d3f911d84635caa89e8fcee5693b7fe36c220c1f"
+    },
+    {
+      "runId": "tck-d5670dc9-85a5-470a-96c2-b6f412c8eb38",
+      "sourceRevision": "413ce135411c4a2445feb4e992ad5a375160d79c"
+    },
+    {
+      "runId": "tck-6cb5ffb3-9df0-4843-9075-1d81ca382396",
+      "sourceRevision": "413ce135411c4a2445feb4e992ad5a375160d79c"
+    },
+    {
+      "runId": "tck-874df9a3-64c6-4e4e-8dad-82995972fca3",
+      "sourceRevision": "413ce135411c4a2445feb4e992ad5a375160d79c"
     }
   ],
   "cases": {
@@ -1647,6 +1659,71 @@
         },
         "absent": true,
         "validLimit": []
+      }
+    },
+    "storage.sync-committed": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "retained": "durable λ",
+        "removed": null,
+        "rows": [
+          {
+            "id": 1,
+            "value": "committed"
+          }
+        ]
+      }
+    },
+    "sql.consumed-write-cursor": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "returned": [
+          {
+            "n": 1
+          },
+          {
+            "n": 2
+          },
+          {
+            "n": 3
+          }
+        ],
+        "rows": [
+          {
+            "n": 1
+          },
+          {
+            "n": 2
+          },
+          {
+            "n": 3
+          }
+        ]
+      }
+    },
+    "sql.open-read-cursor": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "first": {
+          "n": 1
+        },
+        "remaining": [
+          {
+            "n": 2
+          },
+          {
+            "n": 3
+          }
+        ]
       }
     }
   },

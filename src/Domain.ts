@@ -30,6 +30,7 @@ export const Observation = Schema.Struct({
 export type Observation = typeof Observation.Type;
 export interface RequestSpec {
   readonly path: string;
+  readonly timeoutMs?: number;
   readonly method?: "GET" | "POST";
   readonly body?: string;
   readonly headers?: Readonly<Record<string, string>>;

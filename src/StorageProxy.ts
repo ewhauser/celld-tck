@@ -11,6 +11,7 @@ const Control = Schema.Struct({
     "drop-response",
   ]),
   durationMs: Schema.Int,
+  pathContains: Schema.optional(Schema.String),
 });
 export const acquireStorageProxy = (
   config = {
@@ -38,7 +39,12 @@ export const acquireStorageProxy = (
     const data = createServer((request, response) => {
       run(
         Effect.gen(function* () {
-          const mode = Date.now() < until ? control.mode : "normal";
+          const mode =
+            Date.now() < until &&
+            (control.pathContains === undefined ||
+              (request.url ?? "").includes(control.pathContains))
+              ? control.mode
+              : "normal";
           const event: (typeof events)[number] = {
             mode,
             method: request.method ?? "GET",
@@ -121,6 +127,7 @@ export const acquireStorageProxy = (
             const next = yield* Schema.decodeUnknownEffect(Control)({
               mode: url.searchParams.get("mode"),
               durationMs: Number(url.searchParams.get("ms")),
+              pathContains: url.searchParams.get("pathContains") ?? undefined,
             });
             if (next.durationMs < 0 || next.durationMs > 15000) {
               response.writeHead(400);
