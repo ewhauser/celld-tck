@@ -1,0 +1,1677 @@
+{
+  "seed": 42,
+  "compatibilityDate": "2026-07-30",
+  "sources": [
+    {
+      "runId": "tck-bf2ac88f-2e51-4d6a-9907-a701eba71f42",
+      "sourceRevision": "d3f911d84635caa89e8fcee5693b7fe36c220c1f"
+    },
+    {
+      "runId": "tck-064f1aeb-a3d0-4699-881a-1a9edff174aa",
+      "sourceRevision": "bf320271eab112573d3134502c99874af7013850"
+    },
+    {
+      "runId": "tck-d05ff807-0700-4ab6-816a-98e7021bb207",
+      "sourceRevision": "d3f911d84635caa89e8fcee5693b7fe36c220c1f"
+    }
+  ],
+  "cases": {
+    "http.request-response": {
+      "status": 201,
+      "headers": {
+        "content-type": "application/json",
+        "x-tck-response": "echo"
+      },
+      "body": {
+        "method": "POST",
+        "query": ["first", "second"],
+        "header": "seed-42",
+        "body": "hello λ 🌍\n"
+      }
+    },
+    "storage.round-trip": [
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "present": false
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "stored": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "stored": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "present": true,
+          "value": {
+            "text": "λ",
+            "empty": "",
+            "zero": 0,
+            "flag": false,
+            "nil": null,
+            "nested": [42, "x"]
+          }
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": [
+          ["item:a", "first"],
+          [
+            "item:b",
+            {
+              "text": "λ",
+              "empty": "",
+              "zero": 0,
+              "flag": false,
+              "nil": null,
+              "nested": [42, "x"]
+            }
+          ]
+        ]
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "present": false
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "deleted": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "present": false
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "deleted": false
+        }
+      }
+    ],
+    "storage.transaction-rollback": [
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "stored": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "error": "tck intentional rollback"
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "present": true,
+          "value": 7
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "present": false
+        }
+      }
+    ],
+    "sql.transaction-rollback": [
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "prepared": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "error": "tck intentional rollback"
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": [
+          {
+            "id": 1,
+            "value": "committed"
+          }
+        ]
+      }
+    ],
+    "http.fetch-abort": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "error": "AbortError"
+      }
+    },
+    "storage.synchronous-kv": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "a": {
+          "value": 1
+        },
+        "list": [
+          ["b", "λ"],
+          [
+            "a",
+            {
+              "value": 1
+            }
+          ]
+        ],
+        "removed": true,
+        "missing": true
+      }
+    },
+    "sql.mixed-rollback": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "error": "Error",
+        "balance": 1,
+        "rows": []
+      }
+    },
+    "context.wait-until": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "present": true,
+        "value": "complete"
+      }
+    },
+    "cache.documented-miss": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "value": "cached",
+        "deleted": true
+      }
+    },
+    "http.body-consumption": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "before": false,
+        "after": true,
+        "text": "λ🌍",
+        "cloned": "λ🌍",
+        "twice": "TypeError",
+        "lateClone": "TypeError"
+      }
+    },
+    "http.headers": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "joined": "first, second",
+        "replaced": "replacement",
+        "deleted": true,
+        "invalid": "TypeError"
+      }
+    },
+    "http.url-formdata": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "pathname": "/a%20b",
+        "query": ["1", "2"],
+        "values": ["first", "λ"],
+        "file": {
+          "name": "bytes.bin",
+          "type": "application/octet-stream",
+          "bytes": [0, 128, 255]
+        }
+      }
+    },
+    "http.encoding": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "bytes": [206, 187, 240, 159, 140, 141],
+        "decoded": "λ🌍",
+        "base64": "AP8=",
+        "decodedBase64": [0, 255],
+        "invalid": "TypeError"
+      }
+    },
+    "http.abort": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "aborted": true,
+        "calls": 1,
+        "reason": "test abort",
+        "thrown": "Error"
+      }
+    },
+    "http.redirect": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "status": 307,
+        "location": "https://example.test/next",
+        "invalid": "RangeError"
+      }
+    },
+    "crypto.sha256-hmac": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "digest": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        "hmac": "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+        "verified": true,
+        "rejected": false,
+        "uuid": true
+      }
+    },
+    "crypto.aes-gcm": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "ciphertext": "58e2fccefa7e3061367f1d57a4e7455a",
+        "plaintext": [],
+        "tampered": "OperationError"
+      }
+    },
+    "web.html-rewriter": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "html": "<p data-test=\"yes\">λ &amp; text</p>"
+      }
+    },
+    "storage.rich-values": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "type": "Object",
+        "value": [
+          [
+            "big",
+            {
+              "type": "bigint",
+              "value": "9007199254740993"
+            }
+          ],
+          [
+            "buffer",
+            {
+              "type": "ArrayBuffer",
+              "value": [8, 9]
+            }
+          ],
+          [
+            "bytes",
+            {
+              "type": "Uint8Array",
+              "value": [0, 127, 128, 255]
+            }
+          ],
+          [
+            "date",
+            {
+              "type": "Date",
+              "value": "2020-01-02T03:04:05.000Z"
+            }
+          ],
+          [
+            "map",
+            {
+              "type": "Map",
+              "value": [
+                [
+                  {
+                    "type": "string",
+                    "value": "first"
+                  },
+                  {
+                    "type": "number",
+                    "value": 1
+                  }
+                ],
+                [
+                  {
+                    "type": "number",
+                    "value": 2
+                  },
+                  {
+                    "type": "string",
+                    "value": "second"
+                  }
+                ]
+              ]
+            }
+          ],
+          [
+            "missing",
+            {
+              "type": "undefined"
+            }
+          ],
+          [
+            "nan",
+            {
+              "type": "number",
+              "value": "NaN"
+            }
+          ],
+          [
+            "negativeInfinity",
+            {
+              "type": "number",
+              "value": "-Infinity"
+            }
+          ],
+          [
+            "negativeZero",
+            {
+              "type": "number",
+              "value": "-0"
+            }
+          ],
+          [
+            "nested",
+            {
+              "type": "Array",
+              "value": [
+                {
+                  "type": "boolean",
+                  "value": false
+                },
+                {
+                  "type": "string",
+                  "value": ""
+                },
+                {
+                  "type": "Object",
+                  "value": [
+                    [
+                      "x",
+                      {
+                        "type": "undefined"
+                      }
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            "nil",
+            {
+              "type": "null"
+            }
+          ],
+          [
+            "positiveInfinity",
+            {
+              "type": "number",
+              "value": "+Infinity"
+            }
+          ],
+          [
+            "set",
+            {
+              "type": "Set",
+              "value": [
+                {
+                  "type": "string",
+                  "value": "b"
+                },
+                {
+                  "type": "string",
+                  "value": "a"
+                }
+              ]
+            }
+          ]
+        ]
+      }
+    },
+    "storage.batch-ranges": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "got": [
+          ["k:a", 1],
+          ["k:c", 3]
+        ],
+        "forward": [["k:b", 2]],
+        "reverse": [
+          ["k:c", 3],
+          ["k:b", 2]
+        ],
+        "after": [["k:b", 2]],
+        "deleted": 2,
+        "remaining": [
+          ["k:b", 2],
+          ["other", 9]
+        ]
+      }
+    },
+    "storage.delete-all": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "values": [],
+        "alarm": null
+      }
+    },
+    "storage.transaction-commit": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "result": 7,
+        "entries": [
+          ["a", 7],
+          ["b", 8]
+        ]
+      }
+    },
+    "storage.explicit-rollback": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "value": 1
+      }
+    },
+    "storage.invalid-input": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "limit": "TypeError",
+        "unserializable": "DataCloneError"
+      }
+    },
+    "sql.bindings-cursors": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "columns": ["id", "text", "n", "empty", "nil", "bytes"],
+        "inserted": [
+          {
+            "id": 1,
+            "text": "λ'",
+            "n": 1.25,
+            "empty": "",
+            "nil": null,
+            "bytes": {
+              "type": "ArrayBuffer",
+              "value": [0, 128, 255]
+            }
+          }
+        ],
+        "raw": [[1, "λ'", null]],
+        "count": {
+          "n": 1
+        }
+      }
+    },
+    "sql.constraints": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "duplicate": true,
+        "nil": true,
+        "multiple": true,
+        "empty": true,
+        "rows": [
+          {
+            "id": 1,
+            "v": "a"
+          }
+        ]
+      }
+    },
+    "sql.transaction-commit": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "returned": 42,
+        "row": {
+          "n": 3
+        }
+      }
+    },
+    "identity.namespace": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "same": true,
+        "different": true,
+        "roundTrip": true,
+        "unique": true,
+        "invalid": "TypeError"
+      }
+    },
+    "concurrency.input-gates": [
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 0,
+          "after": 1,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 1,
+          "after": 2,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 4,
+          "after": 5,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 11,
+          "after": 12,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 2,
+          "after": 3,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 3,
+          "after": 4,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 5,
+          "after": 6,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 6,
+          "after": 7,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 7,
+          "after": 8,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 10,
+          "after": 11,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 8,
+          "after": 9,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 9,
+          "after": 10,
+          "initialized": true
+        }
+      }
+    ],
+    "concurrency.explicit-gate": [
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 1,
+          "after": 2,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 10,
+          "after": 11,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 2,
+          "after": 3,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 0,
+          "after": 1,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 3,
+          "after": 4,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 8,
+          "after": 9,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 4,
+          "after": 5,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 5,
+          "after": 6,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 6,
+          "after": 7,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 7,
+          "after": 8,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 11,
+          "after": 12,
+          "initialized": true
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": 9,
+          "after": 10,
+          "initialized": true
+        }
+      }
+    ],
+    "rpc.structured-clone": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "type": "Object",
+        "value": [
+          [
+            "big",
+            {
+              "type": "bigint",
+              "value": "9007199254740993"
+            }
+          ],
+          [
+            "buffer",
+            {
+              "type": "ArrayBuffer",
+              "value": [8, 9]
+            }
+          ],
+          [
+            "bytes",
+            {
+              "type": "Uint8Array",
+              "value": [0, 127, 128, 255]
+            }
+          ],
+          [
+            "date",
+            {
+              "type": "Date",
+              "value": "2020-01-02T03:04:05.000Z"
+            }
+          ],
+          [
+            "map",
+            {
+              "type": "Map",
+              "value": [
+                [
+                  {
+                    "type": "string",
+                    "value": "first"
+                  },
+                  {
+                    "type": "number",
+                    "value": 1
+                  }
+                ],
+                [
+                  {
+                    "type": "number",
+                    "value": 2
+                  },
+                  {
+                    "type": "string",
+                    "value": "second"
+                  }
+                ]
+              ]
+            }
+          ],
+          [
+            "missing",
+            {
+              "type": "undefined"
+            }
+          ],
+          [
+            "nan",
+            {
+              "type": "number",
+              "value": "NaN"
+            }
+          ],
+          [
+            "negativeInfinity",
+            {
+              "type": "number",
+              "value": "-Infinity"
+            }
+          ],
+          [
+            "negativeZero",
+            {
+              "type": "number",
+              "value": "-0"
+            }
+          ],
+          [
+            "nested",
+            {
+              "type": "Array",
+              "value": [
+                {
+                  "type": "boolean",
+                  "value": false
+                },
+                {
+                  "type": "string",
+                  "value": ""
+                },
+                {
+                  "type": "Object",
+                  "value": [
+                    [
+                      "x",
+                      {
+                        "type": "undefined"
+                      }
+                    ]
+                  ]
+                }
+              ]
+            }
+          ],
+          [
+            "nil",
+            {
+              "type": "null"
+            }
+          ],
+          [
+            "positiveInfinity",
+            {
+              "type": "number",
+              "value": "+Infinity"
+            }
+          ],
+          [
+            "set",
+            {
+              "type": "Set",
+              "value": [
+                {
+                  "type": "string",
+                  "value": "b"
+                },
+                {
+                  "type": "string",
+                  "value": "a"
+                }
+              ]
+            }
+          ]
+        ]
+      }
+    },
+    "rpc.thrown-error": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "error": "TypeError"
+      }
+    },
+    "rpc.returned-target": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "sum": 42
+      }
+    },
+    "alarms.set-replace-delete": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "set": true,
+        "replaced": true,
+        "deleted": null
+      }
+    },
+    "alarms.fire": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "fires": 1,
+        "retry": false,
+        "retryCount": 0
+      }
+    },
+    "alarms.retry": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "fires": 2,
+        "retry": true,
+        "retryCount": 1
+      }
+    },
+    "streams.tee": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "a": [0, 128, 255, 10],
+        "b": [0, 128, 255, 10]
+      }
+    },
+    "streams.cancel": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "first": {
+          "value": "first",
+          "done": false
+        },
+        "reason": "stop",
+        "pulls": 1,
+        "after": {
+          "done": true
+        }
+      }
+    },
+    "streams.error": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "error": "TypeError"
+      }
+    },
+    "streams.transform": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "text": "AΛ"
+      }
+    },
+    "streams.backpressure": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "initial": 1,
+        "blocked": 0,
+        "resumed": 1,
+        "trace": ["one"]
+      }
+    },
+    "streams.http-binary": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/octet-stream"
+      },
+      "body": [0, 1, 128, 255, 10]
+    },
+    "websocket.protocol-attachment": [
+      {
+        "type": "open"
+      },
+      {
+        "type": "message",
+        "value": "hello λ"
+      },
+      {
+        "type": "message",
+        "value": [0, 128, 255]
+      },
+      {
+        "type": "message",
+        "value": "{\"label\":\"durable\",\"count\":7}"
+      },
+      {
+        "type": "close",
+        "code": 1000,
+        "reason": "done",
+        "clean": true
+      }
+    ],
+    "workflows.retry": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "status": "complete",
+        "output": {
+          "attempts": 2
+        }
+      }
+    },
+    "workflows.event": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "status": "complete",
+        "output": {
+          "payload": {
+            "value": "λ"
+          },
+          "type": "continue"
+        }
+      }
+    },
+    "rpc.named-service": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "greeting": "hello λ"
+      }
+    },
+    "kv.metadata-list": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "value": {
+          "value": {
+            "value": "λ"
+          },
+          "metadata": {
+            "tag": 7
+          }
+        },
+        "names": ["/a"],
+        "complete": true,
+        "missing": null
+      }
+    },
+    "kv.binary-pagination": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "bytes": [0, 128, 255],
+        "first": ["/a"],
+        "second": ["/b"],
+        "complete": true
+      }
+    },
+    "d1.bindings-results": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "success": true,
+        "inserted": [
+          {
+            "n": 7,
+            "text": "λ'"
+          }
+        ],
+        "first": {
+          "n": 7,
+          "text": "λ'",
+          "bytes": [0, 255]
+        },
+        "raw": [[7, "λ'"]]
+      }
+    },
+    "d1.batch-rollback": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "rejected": true,
+        "value": 1
+      }
+    },
+    "r2.metadata-range-delete": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "bytes": [0, 128, 255, 10],
+        "range": [128, 255],
+        "size": 4,
+        "type": "application/test",
+        "metadata": {
+          "label": "λ"
+        },
+        "sameEtag": true,
+        "names": ["/a"],
+        "missing": null
+      }
+    },
+    "r2.conditional-write": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "rejected": true,
+        "accepted": true,
+        "value": "second"
+      }
+    },
+    "r2.multipart": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "part": 1,
+        "value": "single final part",
+        "aborted": null
+      }
+    },
+    "queues.batch-ack-retry": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "batch-a": {
+          "attempts": 1,
+          "retry": false
+        },
+        "batch-b": {
+          "attempts": 1,
+          "retry": false
+        },
+        "single": {
+          "attempts": 2,
+          "retry": true
+        }
+      }
+    },
+    "workflows.steps-sleep-result": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "status": "complete",
+        "output": {
+          "result": 41
+        }
+      }
+    },
+    "node.buffer": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "hex": "cebbf09f8c8d",
+        "base64": "zrvwn4yN",
+        "roundTrip": "λ🌍",
+        "slice": [206, 187]
+      }
+    },
+    "node.path-events": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "path": "/b/c",
+        "basename": "b",
+        "trace": ["once:a", "on:a", "on:b"],
+        "remaining": 0
+      }
+    },
+    "node.async-context": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "inside": "request",
+        "outsideMissing": true
+      }
+    },
+    "node.hash-compression": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        "gzip": "hello λ",
+        "gzipBytes": "H4sIAAAAAAAAE8tIzcnJVzi3GwA5Y5TOCAAAAA==",
+        "deflate": "hello λ",
+        "deflateBytes": "eJzLSM3JyVc4txsADyIDvg=="
+      }
+    },
+    "wasm.module": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "positive": 42,
+        "negative": -5,
+        "overflow": -2147483648
+      }
+    },
+    "assets.binding": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "status": 200,
+        "text": "hello asset λ\n",
+        "header": "present",
+        "missing": 404
+      }
+    },
+    "dynamic.fetch": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "status": 200,
+        "text": "dynamic λ"
+      }
+    },
+    "facets.isolation": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "a": {
+          "n": 1
+        },
+        "b": {
+          "n": 2
+        },
+        "c": {
+          "n": 1
+        }
+      }
+    },
+    "repro.body-readers": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": [
+        {
+          "kind": "Request",
+          "method": "text",
+          "before": false,
+          "after": true,
+          "second": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          }
+        },
+        {
+          "kind": "Request",
+          "method": "json",
+          "before": false,
+          "after": true,
+          "second": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          }
+        },
+        {
+          "kind": "Request",
+          "method": "arrayBuffer",
+          "before": false,
+          "after": true,
+          "second": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          }
+        },
+        {
+          "kind": "Request",
+          "method": "blob",
+          "before": false,
+          "after": true,
+          "second": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          }
+        },
+        {
+          "kind": "Request",
+          "method": "formData",
+          "before": false,
+          "after": true,
+          "second": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          }
+        },
+        {
+          "kind": "Request",
+          "method": "null-body-control",
+          "first": "",
+          "second": "",
+          "used": false
+        },
+        {
+          "kind": "Response",
+          "method": "text",
+          "before": false,
+          "after": true,
+          "second": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          }
+        },
+        {
+          "kind": "Response",
+          "method": "json",
+          "before": false,
+          "after": true,
+          "second": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          }
+        },
+        {
+          "kind": "Response",
+          "method": "arrayBuffer",
+          "before": false,
+          "after": true,
+          "second": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          }
+        },
+        {
+          "kind": "Response",
+          "method": "blob",
+          "before": false,
+          "after": true,
+          "second": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          }
+        },
+        {
+          "kind": "Response",
+          "method": "formData",
+          "before": false,
+          "after": true,
+          "second": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          }
+        },
+        {
+          "kind": "Response",
+          "method": "null-body-control",
+          "first": "",
+          "second": "",
+          "used": false
+        }
+      ]
+    },
+    "repro.storage-errors": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "asyncLimit": {
+          "outcome": "rejected",
+          "name": "TypeError",
+          "domException": false
+        },
+        "syncLimit": {
+          "outcome": "rejected",
+          "name": "TypeError",
+          "domException": false
+        },
+        "asyncPut": {
+          "outcome": "rejected",
+          "name": "DataCloneError",
+          "domException": true
+        },
+        "syncPut": {
+          "outcome": "rejected",
+          "name": "DataCloneError",
+          "domException": true
+        },
+        "batchPut": {
+          "outcome": "rejected",
+          "name": "DataCloneError",
+          "domException": true
+        },
+        "absent": true,
+        "validLimit": []
+      }
+    }
+  },
+  "divergences": {
+    "cache.documented-miss": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "value": null,
+        "deleted": false
+      }
+    },
+    "rpc.returned-target": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "error": {
+          "name": "Error",
+          "message": "RPC stubs cannot cross isolate boundaries yet."
+        }
+      }
+    }
+  }
+}
