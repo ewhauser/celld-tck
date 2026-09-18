@@ -1,4 +1,4 @@
-import { retryRead, pendingPhase, waitForReady } from "./Polling.js";
+import { readEventually, waitForReady } from "./Polling.js";
 import { Effect, Schema } from "effect";
 import { provenance } from "./Provenance.js";
 import { Artifacts } from "./Artifacts.js";
@@ -222,14 +222,7 @@ export const runMultinode = (options: {
           yield* fleet.kill(owner);
           yield* Effect.sleep("11 seconds");
           // Cold activation can take time; retry read transport/setup only, then assert data once.
-          yield* read(survivor).pipe((probe) =>
-            retryRead(probe, {
-              retryable: pendingPhase("http"),
-              interval: "500 millis",
-              attempts: 21,
-              timeout: "45 seconds",
-            }),
-          );
+          yield* readEventually(read(survivor));
           yield* check(survivor);
           yield* checkHandoff(original, yield* fleet.owner(cell), survivor);
           yield* write(survivor, 3);
@@ -253,24 +246,7 @@ export const runMultinode = (options: {
           const isolated = prior.node;
           const healthy = isolated === "celld" ? "celld2" : "celld";
           yield* fleet.partition(isolated);
-          yield* Effect.gen(function* () {
-            const state = yield* fleet.inspect(isolated);
-            if (state.State.Running)
-              return yield* Effect.fail(
-                new TckError({
-                  phase: "fence-pending",
-                  message: "Waiting for lease fence",
-                }),
-              );
-            yield* equal(state.State.ExitCode, 3);
-          }).pipe((probe) =>
-            retryRead(probe, {
-              retryable: pendingPhase("fence-pending"),
-              interval: "1 second",
-              attempts: 31,
-              timeout: "40 seconds",
-            }),
-          );
+          yield* fleet.fenced(isolated);
           const logs = yield* fleet.logs(isolated);
           yield* artifacts.text("partition-node.log", logs);
           yield* equal(logs.includes("node_lease_watchdog_fence"), true);
@@ -283,14 +259,7 @@ export const runMultinode = (options: {
               refused.response.status >= 200 && refused.response.status < 300,
               false,
             );
-          yield* read(healthy).pipe((probe) =>
-            retryRead(probe, {
-              retryable: pendingPhase("http"),
-              interval: "500 millis",
-              attempts: 21,
-              timeout: "45 seconds",
-            }),
-          );
+          yield* readEventually(read(healthy));
           yield* check(healthy);
           yield* checkHandoff(prior, yield* fleet.owner(cell), healthy);
           yield* write(healthy, 6);
@@ -350,14 +319,7 @@ export const runMultinode = (options: {
             );
             yield* fleet.kill(leader);
             yield* Effect.sleep("11 seconds");
-            yield* read(follower).pipe((probe) =>
-              retryRead(probe, {
-                retryable: pendingPhase("http"),
-                interval: "500 millis",
-                attempts: 21,
-                timeout: "60 seconds",
-              }),
-            );
+            yield* readEventually(read(follower), { timeout: "60 seconds" });
             yield* check(follower);
             yield* checkHandoff(prior, yield* fleet.owner(cell), follower);
             const recoveredLogs = yield* Effect.forEach(

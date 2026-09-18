@@ -25,6 +25,19 @@ export const retryRead = <A, E, R>(
 export const pendingPhase = (phase: string) => (error: unknown) =>
   error instanceof TckError && error.phase === phase;
 
+// A read whose target may still be activating: only transport failures are
+// retried, so semantic assertions on the returned value run exactly once.
+export const readEventually = <A, E, R>(
+  probe: Effect.Effect<A, E, R>,
+  budget: { attempts?: number; timeout?: Duration.Input } = {},
+) =>
+  retryRead(probe, {
+    retryable: pendingPhase("http"),
+    interval: "500 millis",
+    attempts: budget.attempts ?? 21,
+    timeout: budget.timeout ?? "45 seconds",
+  });
+
 export const pollUntil = <A, E, R>(
   probe: Effect.Effect<A, E, R>,
   done: (value: A) => boolean,

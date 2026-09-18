@@ -1,4 +1,4 @@
-import { retryRead, pendingPhase } from "./Polling.js";
+import { readEventually, retryRead, pendingPhase } from "./Polling.js";
 import { Effect, Exit, Fiber, Schema } from "effect";
 import { Artifacts } from "./Artifacts.js";
 import { attemptRequest, TckError, type Observation } from "./Domain.js";
@@ -68,33 +68,7 @@ export const resilienceStages = (ctx: ResilienceContext) =>
     const others = (node: Node) => nodes.filter((peer) => peer !== node);
     const checkAll = () => Effect.forEach(nodes, ctx.check, { discard: true });
     const readable = (node: Node) =>
-      ctx.read(node).pipe((probe) =>
-        retryRead(probe, {
-          retryable: pendingPhase("http"),
-          interval: "500 millis",
-          attempts: 31,
-          timeout: "60 seconds",
-        }),
-      );
-    const fenced = (node: Node) =>
-      Effect.gen(function* () {
-        const current = yield* fleet.inspect(node);
-        if (current.State.Running)
-          return yield* Effect.fail(
-            new TckError({
-              phase: "fence-pending",
-              message: "Waiting for frozen owner to self-fence",
-            }),
-          );
-        yield* equal(current.State.ExitCode, 3);
-      }).pipe((probe) =>
-        retryRead(probe, {
-          retryable: pendingPhase("fence-pending"),
-          interval: "500 millis",
-          attempts: 41,
-          timeout: "30 seconds",
-        }),
-      );
+      readEventually(ctx.read(node), { attempts: 31, timeout: "60 seconds" });
     const ensemble = (
       node: Node,
       peers: readonly Node[],
@@ -160,7 +134,7 @@ export const resilienceStages = (ctx: ResilienceContext) =>
           yield* equal(next.epoch > prior.epoch, true);
           yield* ctx.write(successor, 110);
           yield* fleet.unpause(prior.node);
-          yield* fenced(prior.node);
+          yield* fleet.fenced(prior.node);
           yield* ctx.start(prior.node);
           yield* ctx.ready(prior.node);
           yield* checkAll();

@@ -1,5 +1,6 @@
 import { fleetFaults } from "./FleetFaults.js";
 import { Effect, Schema } from "effect";
+import { pendingPhase, retryRead } from "./Polling.js";
 import { Artifacts, decodeJson } from "./Artifacts.js";
 import { Processes } from "./Processes.js";
 import { TckError, type Target } from "./Domain.js";
@@ -60,6 +61,26 @@ export const fleetControls = (
         yield* equal(state.Config.Labels["com.docker.compose.service"], node);
         return state;
       });
+    // A node cut off from its lease must exit 3 on its own; wait for that proof.
+    const fenced = (node: Node) =>
+      Effect.gen(function* () {
+        const current = yield* inspect(node);
+        if (current.State.Running)
+          return yield* Effect.fail(
+            new TckError({
+              phase: "fence-pending",
+              message: "Waiting for lease fence",
+            }),
+          );
+        yield* equal(current.State.ExitCode, 3);
+      }).pipe((probe) =>
+        retryRead(probe, {
+          retryable: pendingPhase("fence-pending"),
+          interval: "500 millis",
+          attempts: 81,
+          timeout: "40 seconds",
+        }),
+      );
     const target = (node: Node) =>
       Effect.gen(function* () {
         const address = yield* publishedPort(
@@ -237,6 +258,7 @@ export const fleetControls = (
           return records;
         }),
       inspect,
+      fenced,
       target,
       owner: (cell: string) =>
         Effect.gen(function* () {
