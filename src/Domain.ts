@@ -6,6 +6,9 @@ export class TckError extends Data.TaggedError("TckError")<{
   readonly detail?: string;
 }> {}
 
+// Default celld lease lifetime is 10 seconds. Wait beyond it before restart.
+export const leaseLapse = Effect.sleep("11 seconds");
+
 export const Target = Schema.Struct({
   name: Schema.String,
   baseUrl: Schema.String,

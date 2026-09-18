@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect";
 import { Artifacts } from "./Artifacts.js";
 import {
   attemptRequest,
+  leaseLapse,
   Transport,
   type Observation,
   type RuntimeHandle,
@@ -105,10 +106,10 @@ export const runOutage = (
     yield* lifecycle.stopStorage();
     // Never retry writes: a missing response cannot establish that a write did not commit.
     for (const id of [2, 3, 4]) yield* write(id);
-    yield* Effect.sleep("11 seconds");
+    yield* leaseLapse;
     // Act as the supervisor: self-fenced processes require restarting. Cold-read even if still running.
     yield* lifecycle.prepareRestart();
-    yield* Effect.sleep("11 seconds");
+    yield* leaseLapse;
     yield* lifecycle.restoreStorage();
     target = yield* lifecycle.start();
     yield* ready();
@@ -121,7 +122,7 @@ export const runOutage = (
     yield* checkOutageState(recovered, outcomes);
     yield* equal((yield* write(5)).acknowledged, true);
     yield* lifecycle.stop(true);
-    yield* Effect.sleep("11 seconds");
+    yield* leaseLapse;
     target = yield* lifecycle.start();
     yield* ready();
     const final = yield* read();

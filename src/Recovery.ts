@@ -3,7 +3,7 @@ import { Effect, Schema } from "effect";
 import { provenance } from "./Provenance.js";
 import { Artifacts } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
-import { Transport, TckError, type Target } from "./Domain.js";
+import { leaseLapse, Transport, TckError, type Target } from "./Domain.js";
 import { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
 import { runOutage } from "./Outage.js";
@@ -170,8 +170,7 @@ export const runRecovery = (options: {
                       "Alarm deadline elapsed before the stopped-state proof",
                   }),
                 );
-              // Default celld lease lifetime is 10 seconds. Wait beyond it before restart.
-              yield* Effect.sleep("11 seconds");
+              yield* leaseLapse;
               if (diskLoss) yield* lifecycle.discardDisk();
               target = yield* lifecycle.start();
               yield* ready();

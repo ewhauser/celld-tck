@@ -3,7 +3,7 @@ import { Effect, Schema } from "effect";
 import { provenance } from "./Provenance.js";
 import { Artifacts } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
-import { attemptRequest, Transport, TckError } from "./Domain.js";
+import { attemptRequest, leaseLapse, Transport, TckError } from "./Domain.js";
 import { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
 import { OutageState, checkOutageState } from "./Outage.js";
@@ -215,7 +215,7 @@ export const runMultinode = (options: {
         "owner-failover",
         Effect.gen(function* () {
           yield* fleet.kill(owner);
-          yield* Effect.sleep("11 seconds");
+          yield* leaseLapse;
           // Cold activation can take time; retry read transport/setup only, then assert data once.
           yield* readEventually(read(survivor));
           yield* check(survivor);
@@ -313,7 +313,7 @@ export const runMultinode = (options: {
               true,
             );
             yield* fleet.kill(leader);
-            yield* Effect.sleep("11 seconds");
+            yield* leaseLapse;
             yield* readEventually(read(follower), { timeout: "60 seconds" });
             yield* check(follower);
             yield* checkHandoff(prior, yield* fleet.owner(cell), follower);

@@ -7,6 +7,7 @@ import {
 } from "./QualificationContext.js";
 import { checkFencedReceipts } from "./History.js";
 import { auditLedger } from "./Audit.js";
+import { leaseLapse } from "./Domain.js";
 const runTraffic = (
   id: "traffic.crash-ledger" | "traffic.paused-owner" | "traffic.restart-races",
   ctx: QualificationContext,
@@ -23,7 +24,7 @@ const runTraffic = (
           .at(-1)!.activation!;
         const successor = nodes.find((node) => node !== prior.node)!;
         yield* fleet.pause(prior.node);
-        yield* Effect.sleep("11 seconds");
+        yield* leaseLapse;
         yield* ctx.writeAcknowledged(successor);
         const after = yield* ctx.owner();
         yield* equal(
@@ -61,7 +62,7 @@ const runTraffic = (
             yield* ctx.start(owner);
             yield* fleet.kill(owner);
           }
-          yield* Effect.sleep("11 seconds");
+          yield* leaseLapse;
           yield* ctx.start(owner);
           yield* Fiber.join(fiber);
           for (const node of nodes) yield* ctx.verify(node);
