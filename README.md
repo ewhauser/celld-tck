@@ -104,7 +104,8 @@ Every new case needs a meaningful negative example that its actual checker rejec
 - [Recovery](docs/RECOVERY.md), [multi-node failover](docs/MULTINODE.md), and [fleet durability](docs/FLEET.md)
 - [Resilience](docs/RESILIENCE.md) and [qualification scenarios](docs/QUALIFICATION.md)
 - [Dashboard publishing and local previews](docs/DASHBOARD.md)
-- [Remaining work](docs/BACKLOG.md)
+- [Coverage roadmap](docs/ROADMAP.md)
+- [Qualification backlog](docs/BACKLOG.md)
 
 ## License
 

@@ -1,5 +1,7 @@
 # Qualification backlog
 
+For planned feature and operational coverage beyond this checklist, see the [coverage roadmap](ROADMAP.md).
+
 This tracks the full P0/P1/P2 checklist, replacing the earlier, narrower local reliability backlog. Implementation details and limits are in [QUALIFICATION.md](QUALIFICATION.md); retained results and failures are in [FINDINGS.md](FINDINGS.md).
 
 | Priority | Suite                         | Implementation                                                                                                                                    | Validation                                                             |
