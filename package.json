@@ -1,0 +1,37 @@
+{
+  "name": "celld-tck",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.15.0",
+  "engines": {
+    "node": ">=24 <27"
+  },
+  "scripts": {
+    "tck": "tsx src/main.ts",
+    "test": "vitest run",
+    "test:reference": "tsx src/main.ts --profile reference",
+    "test:local": "tsx src/main.ts --profile local",
+    "types:fixtures": "wrangler types --config fixtures/core/wrangler.jsonc fixtures/core/worker-configuration.d.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p fixtures/tsconfig.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "pnpm format:check && pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "jsonc-parser": "3.3.1",
+    "effect": "4.0.0-rc.115",
+    "@effect/platform-node": "4.0.0-rc.115"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.0-rc.115",
+    "@types/node": "24.13.5",
+    "esbuild": "0.28.2",
+    "miniflare": "4.20260730.0",
+    "prettier": "3.8.3",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2",
+    "vitest": "5.0.1",
+    "wrangler": "4.112.0"
+  }
+}

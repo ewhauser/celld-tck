@@ -1,0 +1,44 @@
+import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import { Effect, Layer } from "effect";
+import { Command, Flag } from "effect/unstable/cli";
+import { FetchHttpClient } from "effect/unstable/http";
+import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
+import { artifactsLayer } from "./Artifacts.js";
+import { TckError } from "./Domain.js";
+import { processesLayer } from "./Processes.js";
+import { runSuite, selectCases } from "./Runner.js";
+import { transportLayer } from "./Transport.js";
+
+const cli = Command.make(
+  "celld-tck",
+  {
+    profile: Flag.Literals("profile", ["local", "reference"]).pipe(
+      Flag.withDefault("local"),
+    ),
+    seed: Flag.Int("seed").pipe(Flag.withDefault(42)),
+    caseId: Flag.String("case").pipe(Flag.withDefault("")),
+    output: Flag.String("output").pipe(Flag.withDefault("artifacts")),
+  },
+  (options) =>
+    Effect.gen(function* () {
+      if (options.seed < 0 || options.seed > 0xffffffff)
+        return yield* Effect.fail(
+          new TckError({
+            phase: "arguments",
+            message: "Seed must be an unsigned 32-bit integer",
+          }),
+        );
+      yield* selectCases(options.caseId);
+      const runId = `tck-${yield* Effect.sync(() => randomUUID())}`;
+      const services = Layer.mergeAll(processesLayer, transportLayer).pipe(
+        Layer.provideMerge(artifactsLayer(resolve(options.output, runId))),
+      );
+      yield* runSuite({ ...options, runId }).pipe(Effect.provide(services));
+    }),
+);
+
+Command.run(cli, { version: "0.0.0" }).pipe(
+  Effect.provide(Layer.mergeAll(NodeServices.layer, FetchHttpClient.layer)),
+  NodeRuntime.runMain,
+);

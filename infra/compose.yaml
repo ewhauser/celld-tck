@@ -1,0 +1,57 @@
+x-celld: &celld
+  image: ghcr.io/denoland/celld:v0.5.0@sha256:df8e74bb9a059df5779644368984933eba76acd6a2d196672732f4368f760fc8
+  environment:
+    AWS_ACCESS_KEY_ID: tck-local
+    AWS_SECRET_ACCESS_KEY: tck-local-disposable-password
+    AWS_REGION: us-east-1
+    AWS_EC2_METADATA_DISABLED: "true"
+    CELLD_BUCKET: s3://tck
+    S3_ENDPOINT: http://minio:9000
+    CELLD_DURABILITY: bucket
+    CELLD_WATCH: /state
+    RUST_LOG: info
+
+services:
+  minio:
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    command: [server, /data]
+    environment:
+      MINIO_ROOT_USER: tck-local
+      MINIO_ROOT_PASSWORD: tck-local-disposable-password
+    volumes: [minio-data:/data]
+  storage:
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    entrypoint: [/bin/sh, -ec]
+    environment:
+      MC_HOST_local: http://tck-local:tck-local-disposable-password@minio:9000
+    command:
+      - |
+        for i in $$(seq 1 60); do
+          if mc mb --ignore-existing local/tck; then exit 0; fi
+          sleep 1
+        done
+        exit 1
+  tool:
+    <<: *celld
+    volumes:
+      - type: bind
+        source: ${TCK_FIXTURE_DIR:?TCK_FIXTURE_DIR must name the built fixture directory}
+        target: /fixture
+        read_only: true
+  celld:
+    <<: *celld
+    command:
+      [
+        --listen,
+        "0.0.0.0:8080",
+        --internal-listen,
+        "0.0.0.0:8081",
+        --advertise,
+        "celld:8081",
+      ]
+    ports: ["127.0.0.1::8080"]
+    volumes: [celld-state:/state]
+
+volumes:
+  minio-data:
+  celld-state:
