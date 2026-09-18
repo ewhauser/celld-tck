@@ -15,3 +15,76 @@ it.effect("failover requires the successor and a strictly newer epoch", () =>
       ).toBe("Failure");
   }),
 );
+
+import { hasFleetProof, hasLogRecovery } from "../src/Multinode.js";
+it.effect(
+  "fleet evidence requires the tested cell and a nonempty recovery for the dead node",
+  () =>
+    Effect.sync(() => {
+      expect(hasFleetProof('durable_wait cell=abc proof="fleet"', "abc")).toBe(
+        true,
+      );
+      expect(hasFleetProof('durable_wait cell=abc proof="bucket"', "abc")).toBe(
+        false,
+      );
+      expect(
+        hasFleetProof('durable_wait cell=other proof="fleet"', "abc"),
+      ).toBe(false);
+      expect(
+        hasFleetProof("log ensemble open; fleet acks enabled", "abc"),
+      ).toBe(false);
+      expect(
+        hasLogRecovery(
+          `node log recovered and sealed dead="celld/${"a".repeat(64)}" entries=3`,
+          "celld",
+        ),
+      ).toBe(true);
+      expect(
+        hasLogRecovery(
+          `node log recovered and sealed dead="celld2/${"a".repeat(64)}" entries=3`,
+          "celld",
+        ),
+      ).toBe(false);
+      expect(
+        hasLogRecovery(
+          'node log recovered and sealed dead="celld" entries=2',
+          "celld",
+        ),
+      ).toBe(true);
+      expect(
+        hasLogRecovery(
+          'node log recovered and sealed dead="celld2" entries=2',
+          "celld",
+        ),
+      ).toBe(false);
+      expect(
+        hasLogRecovery(
+          'node log recovered and sealed dead="celld" entries=0',
+          "celld",
+        ),
+      ).toBe(false);
+    }),
+);
+
+import { checkEnsemble } from "../src/Resilience.js";
+it.effect(
+  "three-node ensemble must contain both distinct remote followers",
+  () =>
+    Effect.gen(function* () {
+      yield* checkEnsemble(
+        "celld",
+        ["celld", "celld2", "celld3"],
+        ["celld3", "celld2"],
+      );
+      for (const invalid of [
+        ["celld2"],
+        ["celld", "celld2"],
+        ["celld2", "celld2"],
+      ] as const)
+        expect(
+          (yield* Effect.exit(
+            checkEnsemble("celld", ["celld", "celld2", "celld3"], invalid),
+          ))._tag,
+        ).toBe("Failure");
+    }),
+);

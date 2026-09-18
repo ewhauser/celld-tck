@@ -18,7 +18,9 @@
     "format:check": "prettier --check .",
     "check": "pnpm format:check && pnpm typecheck && pnpm test",
     "test:recovery": "tsx src/main.ts --profile local --suite recovery",
-    "test:multinode": "tsx src/main.ts --profile local --suite multinode"
+    "test:multinode": "tsx src/main.ts --profile local --suite multinode",
+    "test:fleet": "tsx src/main.ts --profile local --suite fleet",
+    "test:resilience": "tsx src/main.ts --profile local --suite resilience"
   },
   "dependencies": {
     "jsonc-parser": "3.3.1",

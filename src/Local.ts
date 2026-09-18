@@ -28,6 +28,8 @@ export const acquireLocal = (
   bundle: Bundle,
   cleanupError: (detail: string) => Effect.Effect<void>,
   multiNode = false,
+  durability: "bucket" | "fleet" = "bucket",
+  nodeCount: 2 | 3 = 2,
 ) =>
   Effect.gen(function* () {
     const processes = yield* Processes;
@@ -76,6 +78,18 @@ export const acquireLocal = (
                 new URL("../infra/multinode.yaml", import.meta.url).pathname,
               ]
             : []),
+          ...(durability === "fleet"
+            ? [
+                "--file",
+                new URL("../infra/fleet.yaml", import.meta.url).pathname,
+              ]
+            : []),
+          ...(multiNode && nodeCount === 3
+            ? [
+                "--file",
+                new URL("../infra/three-node.yaml", import.meta.url).pathname,
+              ]
+            : []),
           ...args,
         ],
         { TCK_FIXTURE_DIR: bundle.directory },
@@ -89,6 +103,20 @@ export const acquireLocal = (
         "multinode.yaml",
         yield* fs.readFileString(
           new URL("../infra/multinode.yaml", import.meta.url).pathname,
+        ),
+      );
+    if (durability === "fleet")
+      yield* artifacts.text(
+        "fleet.yaml",
+        yield* fs.readFileString(
+          new URL("../infra/fleet.yaml", import.meta.url).pathname,
+        ),
+      );
+    if (multiNode && nodeCount === 3)
+      yield* artifacts.text(
+        "three-node.yaml",
+        yield* fs.readFileString(
+          new URL("../infra/three-node.yaml", import.meta.url).pathname,
         ),
       );
     return yield* owned(
@@ -179,7 +207,16 @@ export const acquireLocal = (
           "tool",
           "--version",
         ])).stdout.trim();
-        yield* compose(["up", "-d", "celld", ...(multiNode ? ["celld2"] : [])]);
+        yield* compose([
+          "up",
+          "-d",
+          "celld",
+          ...(multiNode
+            ? nodeCount === 3
+              ? ["celld2", "celld3"]
+              : ["celld2"]
+            : []),
+        ]);
         const address = (yield* compose([
           "port",
           "celld",
@@ -500,8 +537,8 @@ export const acquireLocal = (
             version,
             project: runId,
             storage: "minio",
-            durability: "bucket",
-            nodes: multiNode ? 2 : 1,
+            durability,
+            nodes: multiNode ? nodeCount : 1,
             fixtureSha256: uploadedHash,
             containers,
           },

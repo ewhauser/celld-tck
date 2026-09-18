@@ -35,6 +35,8 @@ export const checkOutageState = (
         expectedSql.push({ id: outcome.id, value: `value-${outcome.id}` });
       }
     }
+    expectedKv.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    expectedSql.sort((a, b) => a.id - b.id);
     // Exact arrays reject partial transactions, duplicates, corrupt payloads, and unknown writes.
     yield* equal(state, { kv: expectedKv, sql: expectedSql });
   });

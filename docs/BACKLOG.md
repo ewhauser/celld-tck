@@ -1,0 +1,22 @@
+# Remaining work
+
+Local reliability is the active completion target. The original design's AWS portability milestone requires an account; managed Cloudflare qualification requires a separate deployment environment. Neither is silently counted as locally verified.
+
+| Item                                                                    | Status         | Acceptance                                                                                                                                                                   |
+| ----------------------------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Two-node fleet proofs and follower recovery                             | Validated      | `test:fleet`, real peer-backed acknowledgment and recovery                                                                                                                   |
+| Three-node ensemble and one-follower loss                               | Validated      | Observe both followers, lose one, verify continued writes and recovery                                                                                                       |
+| Paused-owner fencing                                                    | Validated      | Advance ownership while the old process is frozen, resume it, preserve the newer history                                                                                     |
+| Interrupted write histories                                             | Validated      | Record responses and ambiguous operations; forbid lost acknowledged or partial transactions                                                                                  |
+| Simultaneous fleet restart                                              | Validated      | Restart all nodes with retained disks and verify the entire history                                                                                                          |
+| Lost replica disks                                                      | Validated      | Drop all owned replica disks after a peer-backed write; require full recovery, explicit refusal, or a matching declared-loss record; reject silent missing acknowledged data |
+| Harness and CI hardening                                                | Validated      | Independent CI jobs, artifact/cleanup tests, provenance and current coverage documentation                                                                                   |
+| Local full validation                                                   | Validated      | Static/unit, reference, API local, recovery, multinode, fleet, resilience                                                                                                    |
+| S3 and AWS attached deployment                                          | Blocked        | AWS account and dedicated test resources unavailable                                                                                                                         |
+| Managed Cloudflare service qualification                                | Blocked        | Dedicated cloud reference environment unavailable                                                                                                                            |
+| Excluded APIs (PITR, WS hibernation, cron, TCP/TLS, Containers/Sandbox) | Deferred scope | API expansion is separate from the active local reliability backlog; see `coverage.json`                                                                                     |
+| Upstream issue submission                                               | Not submitted  | Drafts exist; no instruction to send issues upstream                                                                                                                         |
+
+The suite is a finite set of observed contracts and fault schedules, not an exhaustive proof of distributed correctness. Any new failure remains visible until diagnosed; no new waiver is inferred from an unsuccessful run.
+
+Validation evidence and development failures are retained in [FINDINGS.md](FINDINGS.md). CI is configured as seven independent jobs; hosted CI has not run. The MinIO diagnostic reset remains an open infrastructure investigation in [BUGS.md](BUGS.md), without a waiver.

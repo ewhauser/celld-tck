@@ -152,7 +152,7 @@
   "excluded": [
     {
       "family": "AWS provisioning and distributed recovery",
-      "reason": "Separate infrastructure and reliability qualification; no cloud resources or fault-injection controls are used by this API suite."
+      "reason": "AWS remains unqualified. Local distributed fault scenarios run separately in the recovery, multinode, fleet, and resilience suites; they are not API differential cases."
     },
     {
       "family": "Containers, Sandbox, and edge-only services",
@@ -163,8 +163,8 @@
       "reason": "Require a clock-controlled or externally reachable reference environment; not established by Miniflare API emulation."
     },
     {
-      "family": "WebSocket hibernation, PITR, and multi-node routing",
-      "reason": "Require explicit lifecycle controls; an open-socket test is not a hibernation test."
+      "family": "WebSocket hibernation and PITR",
+      "reason": "Require API-specific lifecycle controls not implemented here; an open-socket test is not a hibernation test. Multi-node routing is tested separately by the multinode, fleet, and resilience suites."
     }
   ]
 }

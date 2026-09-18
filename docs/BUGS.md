@@ -29,3 +29,11 @@ pnpm tck --profile local --known-bugs error
 4. After a verified fix, remove or revise affected expectations, mark the bug fixed, and update this table. An expectation may only reference open bugs. A runtime upgrade requires revalidation, even if the old behavior persists.
 
 The registry is schema-validated before provisioning. Unknown cases, duplicate registrations/IDs, and missing or fixed bug references are rejected. These narrowly scoped expectations acknowledge bugs; they do not change the semantic oracle or claim API compatibility.
+
+## Infrastructure investigations (not waived)
+
+| ID        | Status                  | Observation                                                                                                                                                        | Policy                                                                                                                                         |
+| --------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| INFRA-001 | Open; cause unconfirmed | Intermittent connection reset during the MinIO conditional-write diagnostic, including `tck-7afe9b5b-93c9-4be7-96c8-6ea25573fb09`. See [FINDINGS.md](FINDINGS.md). | Setup fails; no automatic retry or registry exemption. The operation may have committed, and this is not a semantic compatibility observation. |
+
+The three-node setup also exposed a celld v0.5.0 operational limitation: a healthy ensemble with one follower does not automatically expand when a second follower joins. This is tracked in [RESILIENCE.md](RESILIENCE.md) as a scenario precondition, not assigned an API waiver or treated as a proven contract violation.

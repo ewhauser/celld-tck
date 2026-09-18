@@ -7,7 +7,25 @@ permissions:
 jobs:
   compatibility:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: checks
+            command: pnpm check
+          - name: reference
+            command: pnpm test:reference
+          - name: local
+            command: pnpm test:local
+          - name: recovery
+            command: pnpm test:recovery
+          - name: multinode
+            command: pnpm test:multinode
+          - name: fleet
+            command: pnpm test:fleet
+          - name: resilience
+            command: pnpm test:resilience
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
@@ -16,14 +34,10 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check
-      - run: pnpm test:reference
-      - run: pnpm test:local
-      - run: pnpm test:recovery
-      - run: pnpm test:multinode
+      - run: ${{ matrix.command }}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: compatibility-evidence
+          name: compatibility-evidence-${{ matrix.name }}
           path: artifacts/
           retention-days: 7

@@ -39,3 +39,31 @@ it.effect("every acknowledged write must survive", () =>
     ).toBe("Failure");
   }),
 );
+it.effect("KV keys sort lexically while SQL IDs sort numerically", () =>
+  Effect.gen(function* () {
+    const observations = {
+      kv: [
+        ["op:1", "value-1"],
+        ["op:10", "value-10"],
+        ["op:2", "value-2"],
+      ] as const,
+      sql: [
+        { id: 1, value: "value-1" },
+        { id: 2, value: "value-2" },
+        { id: 10, value: "value-10" },
+      ],
+    };
+    yield* checkOutageState(
+      observations,
+      [1, 2, 10].map((id) => ({ id, acknowledged: true })),
+    );
+    expect(
+      (yield* Effect.exit(
+        checkOutageState(
+          { ...observations, kv: [...observations.kv].reverse() },
+          [1, 2, 10].map((id) => ({ id, acknowledged: true })),
+        ),
+      ))._tag,
+    ).toBe("Failure");
+  }),
+);

@@ -1,4 +1,5 @@
 import { Cause, Console, Effect, Exit, Schedule, Schema } from "effect";
+import { provenance } from "./Provenance.js";
 import { Artifacts } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
 import {
@@ -97,6 +98,7 @@ export const runRecovery = (options: {
     const exit = yield* Effect.exit(
       Effect.scoped(
         Effect.gen(function* () {
+          Object.assign(environment, yield* provenance);
           const bundle = yield* buildFixtureFor("recovery");
           environment.fixtureSha256 = bundle.sha256;
           const runtime = yield* acquireLocal(

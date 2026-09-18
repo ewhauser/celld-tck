@@ -23,7 +23,7 @@ export class Recovery extends DurableObject<RecoveryEnv> {
         if (path === "/fleet/id") return Response.json({ cell });
         if (path === "/outage/write") {
           const id = Number(new URL(request.url).searchParams.get("id"));
-          if (!Number.isInteger(id) || id < 1 || id > 32)
+          if (!Number.isInteger(id) || id < 1 || id > 256)
             return new Response("invalid id", { status: 400 });
           yield* Effect.sync(() =>
             storage.transactionSync(() => {
@@ -38,6 +38,10 @@ export class Recovery extends DurableObject<RecoveryEnv> {
               storage.kv.put(`op:${id}`, `value-${id}`);
             }),
           );
+          if (new URL(request.url).searchParams.get("hold") === "1") {
+            yield* Effect.log(`tck-interrupted-write id=${id}`);
+            yield* Effect.sleep("5 seconds");
+          }
           return Response.json({ acknowledged: id });
         }
         if (path === "/outage/state")

@@ -95,3 +95,54 @@ it.effect("disk loss refuses running, foreign, or non-state volumes", () =>
     ).toBe("Failure");
   }),
 );
+
+it.effect("fleet disk removal validates each node's volume independently", () =>
+  Effect.gen(function* () {
+    const project = "tck-fleet";
+    for (const service of ["celld2", "celld3"] as const) {
+      const name = `${project}_${service}-state`;
+      const container = {
+        Id: "owned",
+        Config: {
+          Labels: {
+            "com.docker.compose.project": project,
+            "com.docker.compose.service": service,
+          },
+        },
+        State: { Running: false, StartedAt: "time" },
+        Mounts: [{ Type: "volume", Name: name, Destination: "/state" }],
+      };
+      const volume = {
+        Name: name,
+        Labels: {
+          "com.docker.compose.project": project,
+          "com.docker.compose.volume": `${service}-state`,
+        },
+      };
+      expect(yield* ownedStateVolume(project, container, volume, service)).toBe(
+        name,
+      );
+      expect(
+        (yield* Effect.exit(
+          ownedStateVolume(project, container, volume, "celld"),
+        ))._tag,
+      ).toBe("Failure");
+      expect(
+        (yield* Effect.exit(
+          ownedStateVolume(
+            project,
+            container,
+            {
+              ...volume,
+              Labels: {
+                ...volume.Labels,
+                "com.docker.compose.volume": "minio-data",
+              },
+            },
+            service,
+          ),
+        ))._tag,
+      ).toBe("Failure");
+    }
+  }),
+);

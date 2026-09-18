@@ -1,6 +1,6 @@
 # celld API compatibility test kit
 
-Status: implemented local API corpus, September 18, 2026. The Effect v4 runner now has 63 differential cases and 6 celld-specific deployment checks, across base-Web, Node-compatibility, and extension fixture deployments. The executable coverage contract is [coverage.json](coverage.json); [FINDINGS.md](FINDINGS.md) records validation results and differences. API-suite implementation does not mean the candidate conforms. AWS adapters, managed Cloudflare qualification, and distributed lifecycle/fault testing remain separate work. No cloud resources have been created.
+Status: implemented local API corpus, September 18, 2026. The Effect v4 runner now has 63 differential cases and 6 celld-specific deployment checks, across base-Web, Node-compatibility, and extension fixture deployments. The executable coverage contract is [coverage.json](coverage.json); [FINDINGS.md](FINDINGS.md) records validation results and differences. API-suite implementation does not mean the candidate conforms. Separate local recovery, two-node bucket/fleet, and three-node resilience suites now implement lifecycle/fault testing; see RECOVERY.md, MULTINODE.md, FLEET.md, and RESILIENCE.md. AWS adapters and managed Cloudflare qualification remain separate work. No cloud resources have been created.
 
 ## Decision
 
@@ -199,7 +199,7 @@ PR gate: reference/candidate core conformance on Docker/MinIO and unit tests of 
 3. **Portability proof:** execute the same three slice cases with local celld against S3, then against an attached dedicated AWS fleet. No edits to case source or assertions; only environment configuration changes.
 4. **Broader API/lifecycle coverage:** add asynchronous service families and lifecycle controls with explicit reference capability limits. Keep reliability/fault testing a separate suite even when it shares provisioning and artifacts.
 
-Milestones 1 and 2 now have a working local implementation, with additional service and extension API cases from milestone 4. Milestone 3 and lifecycle controls remain unimplemented. The first milestone demonstrated correctness of the harness before growing the corpus. Avoid committing to a test-count target that rewards redundant cases over observable behaviors.
+Milestones 1 and 2 now have a working local implementation, with additional service and extension API cases from milestone 4. Milestone 3 remains blocked on cloud resources. Local lifecycle controls now support restart, disk loss, storage partitions, process pause, and multi-node fleet recovery through separate suites; these do not qualify AWS or managed Cloudflare. The first milestone demonstrated correctness of the harness before growing the corpus. Avoid committing to a test-count target that rewards redundant cases over observable behaviors.
 
 ## Source notes
 

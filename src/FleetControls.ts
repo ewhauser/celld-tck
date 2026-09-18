@@ -2,8 +2,10 @@ import { Effect, Schema } from "effect";
 import { Artifacts, decodeJson } from "./Artifacts.js";
 import { Processes } from "./Processes.js";
 import { TckError, type Target } from "./Domain.js";
+import { DiskContainer, DiskVolume, ownedStateVolume } from "./DiskLoss.js";
 import { equal } from "./Oracle.js";
-export const Node = Schema.Literals(["celld", "celld2"]);
+import { cleanupAll } from "./Resources.js";
+export const Node = Schema.Literals(["celld", "celld2", "celld3"]);
 export type Node = typeof Node.Type;
 export const Owner = Schema.Struct({ node: Node, epoch: Schema.Int });
 export const fleetControls = (
@@ -17,6 +19,7 @@ export const fleetControls = (
     const processes = yield* Processes;
     const artifacts = yield* Artifacts;
     let sequence = 0;
+    const paused = new Set<Node>();
     const inspect = (node: Node) =>
       Effect.gen(function* () {
         const id = (yield* compose(["ps", "--all", "-q", node])).stdout.trim();
@@ -31,6 +34,7 @@ export const fleetControls = (
               }),
               State: Schema.Struct({
                 Running: Schema.Boolean,
+                Paused: Schema.Boolean,
                 ExitCode: Schema.Int,
               }),
               NetworkSettings: Schema.Struct({
@@ -67,7 +71,164 @@ export const fleetControls = (
           );
         return { ...base, name: node, baseUrl: `http://${address}` };
       });
+    yield* Effect.addFinalizer(() =>
+      cleanupAll([...paused].map((node) => compose(["unpause", node]))).pipe(
+        Effect.orDie,
+      ),
+    );
     return {
+      pause: (node: Node) =>
+        Effect.gen(function* () {
+          yield* equal((yield* inspect(node)).State.Running, true);
+          paused.add(node);
+          yield* compose(["pause", node]);
+          yield* equal((yield* inspect(node)).State.Paused, true);
+        }),
+      unpause: (node: Node) =>
+        Effect.gen(function* () {
+          yield* compose(["unpause", node]);
+          paused.delete(node);
+          yield* equal((yield* inspect(node)).State.Paused, false);
+        }),
+      lease: (node: Node) =>
+        Effect.gen(function* () {
+          const raw = (yield* compose([
+            "run",
+            "--rm",
+            "-T",
+            "--entrypoint",
+            "mc",
+            "storage",
+            "cat",
+            `local/tck/nodes/${node}.json`,
+          ])).stdout;
+          yield* artifacts.text(`lease-${++sequence}-${node}.json`, raw);
+          return yield* decodeJson(
+            Schema.Struct({
+              probe_public_key: Schema.String,
+              log: Schema.optionalKey(
+                Schema.Struct({
+                  state: Schema.String,
+                  epoch: Schema.Int,
+                  active: Schema.Boolean,
+                  ensemble: Schema.Array(Node),
+                }),
+              ),
+            }),
+            raw,
+          );
+        }),
+      discard: (node: Node) =>
+        Effect.gen(function* () {
+          const current = yield* inspect(node);
+          const raw = (yield* processes.run("docker", ["inspect", current.Id]))
+            .stdout;
+          const container = (yield* decodeJson(
+            Schema.Array(DiskContainer),
+            raw,
+          ))[0]!;
+          const volumesRaw = (yield* processes.run("docker", [
+            "volume",
+            "inspect",
+            `${project}_${node}-state`,
+          ])).stdout;
+          const volume = (yield* decodeJson(
+            Schema.Array(DiskVolume),
+            volumesRaw,
+          ))[0]!;
+          const name = yield* ownedStateVolume(
+            project,
+            container,
+            volume,
+            node,
+          );
+          const logs = yield* compose([
+            "logs",
+            "--no-color",
+            "--timestamps",
+            node,
+          ]);
+          yield* artifacts.text(
+            `before-discard-${node}.log`,
+            logs.stdout + logs.stderr,
+          );
+          yield* artifacts.text(`discard-${node}-container.json`, raw);
+          yield* artifacts.text(`discard-${node}-volume.json`, volumesRaw);
+          yield* compose(["rm", "--force", node]);
+          yield* processes.run("docker", ["volume", "rm", name]);
+          yield* compose(["create", node]);
+          yield* compose([
+            "run",
+            "--no-deps",
+            "--rm",
+            "-T",
+            "--volume",
+            `${name}:/empty:ro`,
+            "--entrypoint",
+            "/bin/sh",
+            "storage",
+            "-ec",
+            'entries=$(ls -A /empty); test -z "$entries"',
+          ]);
+          yield* artifacts.json(`discard-${node}.json`, {
+            volume: name,
+            emptyBeforeStart: true,
+          });
+        }),
+      losses: () =>
+        Effect.gen(function* () {
+          const found = (yield* compose([
+            "run",
+            "--rm",
+            "-T",
+            "--entrypoint",
+            "mc",
+            "storage",
+            "find",
+            "local/tck/log",
+            "--name",
+            "*.loss.json",
+          ])).stdout
+            .trim()
+            .split("\n")
+            .filter(Boolean);
+          const records: Array<{
+            leader: string;
+            epoch: number;
+            note: string;
+          }> = [];
+          for (const path of found) {
+            if (!/^local\/tck\/log\/[a-zA-Z0-9/_.-]+\.loss\.json$/.test(path))
+              return yield* Effect.fail(
+                new TckError({
+                  phase: "fleet",
+                  message: "Invalid loss-record path",
+                }),
+              );
+            const raw = (yield* compose([
+              "run",
+              "--rm",
+              "-T",
+              "--entrypoint",
+              "mc",
+              "storage",
+              "cat",
+              path,
+            ])).stdout;
+            yield* artifacts.text(`loss-record-${++sequence}.json`, raw);
+            records.push(
+              yield* decodeJson(
+                Schema.Struct({
+                  leader: Schema.String,
+                  epoch: Schema.Int,
+                  note: Schema.String,
+                }),
+                raw,
+              ),
+            );
+          }
+          return records;
+        }),
       inspect,
       target,
       owner: (cell: string) =>
@@ -98,6 +259,7 @@ export const fleetControls = (
           yield* compose(["kill", "--signal", "SIGKILL", node]);
           yield* equal((yield* inspect(node)).State, {
             Running: false,
+            Paused: false,
             ExitCode: 137,
           });
         }),

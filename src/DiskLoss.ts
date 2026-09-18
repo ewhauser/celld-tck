@@ -23,23 +23,24 @@ export const ownedStateVolume = (
   project: string,
   container: typeof DiskContainer.Type,
   volume: typeof DiskVolume.Type,
+  service: "celld" | "celld2" | "celld3" = "celld",
 ) =>
   Effect.gen(function* () {
     const mounts = container.Mounts.filter(
       (mount) => mount.Destination === "/state",
     );
-    const expected = `${project}_celld-state`;
+    const expected = `${project}_${service}-state`;
     if (
       !project.startsWith("tck-") ||
       container.State.Running ||
       container.Config.Labels["com.docker.compose.project"] !== project ||
-      container.Config.Labels["com.docker.compose.service"] !== "celld" ||
+      container.Config.Labels["com.docker.compose.service"] !== service ||
       mounts.length !== 1 ||
       mounts[0]?.Type !== "volume" ||
       mounts[0]?.Name !== expected ||
       volume.Name !== expected ||
       volume.Labels["com.docker.compose.project"] !== project ||
-      volume.Labels["com.docker.compose.volume"] !== "celld-state"
+      volume.Labels["com.docker.compose.volume"] !== `${service}-state`
     )
       return yield* Effect.fail(
         new TckError({
