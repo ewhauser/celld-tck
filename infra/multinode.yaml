@@ -5,6 +5,8 @@ services:
     networks: [store]
   tool:
     networks: [store]
+  proxy:
+    networks: [store]
   celld:
     environment:
       CELLD_NODE: celld
