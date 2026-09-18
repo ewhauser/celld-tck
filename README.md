@@ -71,13 +71,13 @@ The optional `repros` suite contains isolated cases for upstream bug reports and
 
 Each run writes reports and debugging evidence to `artifacts/tck-<uuid>/`, including:
 
-- `report.json` and `junit.xml` for test results.
+- `report.json` and `junit.xml` for test results, including handled interruption and cleanup failures. API reports retain the driver Node.js version in `environment.hostNode`; fixture provenance is grouped under `environment.fixtures.core|node|extensions|repro`.
 - `run.json` and `coverage.json` for versions, configuration, seed, and selected cases.
 - Process logs, HTTP and WebSocket observations, and deployed fixtures for investigating failures.
 
 Use `--output ./artifacts` to choose a different output directory.
 
-Unexpected failures make the command exit nonzero. Registered [known bugs](docs/BUGS.md) are reported separately and allowed by default, but only for the exact celld version and observations in the registry. To make known bugs fail the run too:
+Unexpected failures make the command exit nonzero. Registered [known bugs](docs/BUGS.md) are reported separately and allowed by default, but only for the exact celld version, compatibility date, compatibility flags, and observations in the registry. To make known bugs fail the run too:
 
 ```sh
 pnpm tck --profile local --known-bugs error

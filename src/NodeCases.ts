@@ -1,3 +1,51 @@
+import { Effect, Schema } from "effect";
+import { gunzipSync, inflateSync } from "node:zlib";
+import { TckError } from "./Domain.js";
+import { equal } from "./Oracle.js";
+
+export const checkCompression = (value: unknown) =>
+  Effect.gen(function* () {
+    const observation = yield* Schema.decodeUnknownEffect(
+      Schema.Struct({
+        status: Schema.Literal(200),
+        headers: Schema.Record(Schema.String, Schema.String),
+        body: Schema.Struct({
+          sha256: Schema.String,
+          gzip: Schema.String,
+          deflate: Schema.String,
+          gzipBytes: Schema.String,
+          deflateBytes: Schema.String,
+        }),
+      }),
+    )(value).pipe(
+      Effect.mapError(
+        (error) => new TckError({ phase: "assertion", message: String(error) }),
+      ),
+    );
+    yield* equal(observation.headers, { "content-type": "application/json" });
+    const body = observation.body;
+    yield* equal(
+      { sha256: body.sha256, gzip: body.gzip, deflate: body.deflate },
+      {
+        sha256:
+          "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        gzip: "hello λ",
+        deflate: "hello λ",
+      },
+    );
+    // The host decoder independently validates emitted streams; encoder bytes may vary.
+    for (const [encoded, decode] of [
+      [body.gzipBytes, gunzipSync],
+      [body.deflateBytes, inflateSync],
+    ] as const) {
+      const decoded = yield* Effect.try({
+        try: () => decode(Buffer.from(encoded, "base64")).toString("utf8"),
+        catch: (error) =>
+          new TckError({ phase: "assertion", message: String(error) }),
+      });
+      yield* equal(decoded, "hello λ");
+    }
+  });
 import { endpoint } from "./CoreCases.js";
 export const nodeCases = [
   endpoint(
@@ -39,4 +87,16 @@ export const nodeCases = [
     },
     "https://celld.dev/docs/cloudflare-compat/#nodejs-compatibility",
   ),
-].map((test) => ({ ...test, fixture: "node" as const }));
+].map((test) => ({
+  ...test,
+  fixture: "node" as const,
+  ...(test.id === "node.hash-compression"
+    ? {
+        check: checkCompression,
+        compare: (reference: unknown, candidate: unknown) =>
+          checkCompression(reference).pipe(
+            Effect.andThen(checkCompression(candidate)),
+          ),
+      }
+    : {}),
+}));

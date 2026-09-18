@@ -5,6 +5,8 @@ export const KnownBugExpectation = Schema.Struct({
   caseId: Schema.String,
   bugIds: Schema.Array(Schema.String),
   celldVersion: Schema.String,
+  compatibilityDate: Schema.String,
+  compatibilityFlags: Schema.Array(Schema.String),
   evidenceRun: Schema.String,
   candidate: Schema.Unknown,
 });

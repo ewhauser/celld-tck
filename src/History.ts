@@ -15,7 +15,7 @@ export const Receipt = Schema.Struct({
   activation: Schema.String,
 });
 export const LedgerEvent = Schema.Struct({
-  kind: Schema.Literals(["intent", "ack", "uncertain"]),
+  kind: Schema.Literals(["intent", "ack", "uncertain", "observed"]),
   id: Schema.String,
   payload: Schema.String,
   at: Schema.Number,
@@ -71,6 +71,9 @@ export const checkHistory = (
       if (event.kind === "intent") {
         yield* equal(intents.has(event.id), false);
         intents.set(event.id, event);
+      } else if (event.kind === "observed") {
+        yield* equal(intents.has(event.id), true);
+        yield* equal(event.payload, intents.get(event.id)!.payload);
       } else {
         yield* equal(intents.has(event.id), true);
         yield* equal(completed.has(event.id), false);
@@ -91,14 +94,17 @@ export const checkHistory = (
     const acknowledged = [...completed.values()].filter(
       (event) => event.kind === "ack",
     );
-    for (const ack of acknowledged) {
+    for (const ack of [
+      ...acknowledged,
+      ...events.filter((event) => event.kind === "observed"),
+    ]) {
       yield* equal(Number.isInteger(ack.seq) && ack.seq! > 0, true);
       yield* equal(ack.at >= intents.get(ack.id)!.at, true);
       const row = rows.find((row) => row.id === ack.id);
       yield* equal(row?.seq, ack.seq);
       yield* equal(row?.payload, ack.payload);
-      yield* equal(typeof ack.activation, "string");
-      // Respect real-time precedence: an operation begun after an acknowledgment
+      if (ack.kind === "ack") yield* equal(typeof ack.activation, "string");
+      // Respect real-time precedence: an operation begun after an acknowledgment or read
       // must occupy a later position. Concurrent operations may serialize either way.
       for (const later of rows)
         if (intents.get(later.id)!.at > ack.at)

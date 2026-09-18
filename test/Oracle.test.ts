@@ -1,11 +1,16 @@
 import { expect, it } from "@effect/vitest";
-import { Effect } from "effect";
+import { Cause, Effect, Exit, Fiber } from "effect";
 import { TckError, Transport, type TestCase } from "../src/Domain.js";
 import { equal, evaluate } from "../src/Oracle.js";
 
 const reference = { name: "reference", baseUrl: "http://unused.invalid" };
 const candidate = { name: "candidate", baseUrl: "http://unused.invalid" };
-const input = { namespace: "test", seed: 42 };
+const input = {
+  compatibilityDate: "2026-07-30",
+  compatibilityFlags: [] as string[],
+  namespace: "test",
+  seed: 42,
+};
 const testCase = (a: unknown, b: unknown): TestCase => ({
   id: "oracle.self-check",
   contract: "test",
@@ -69,6 +74,8 @@ const divergent = {
   ...testCase({ value: 42 }, { value: 0 }),
   divergence: {
     celldVersion: "0.5.0",
+    compatibilityDate: "2026-07-30",
+    compatibilityFlags: [],
     source: "https://example.test/contract",
     reason: "test divergence",
     reviewDate: "2026-09-18",
@@ -129,4 +136,88 @@ it.effect(
         websocket: () => Effect.die("unused"),
       }),
     ),
+);
+
+it.effect("never waives divergent checker defects or interruptions", () =>
+  Effect.gen(function* () {
+    for (const phase of ["check", "compare"] as const) {
+      const broken = {
+        ...divergent,
+        check: (value: unknown) =>
+          value && (value as { value: number }).value === 42
+            ? Effect.void
+            : Effect.die("broken checker"),
+        ...(phase === "compare"
+          ? {
+              check: () => Effect.void,
+              compare: () => Effect.die("broken checker"),
+            }
+          : {}),
+      };
+      const result = yield* evaluate(broken, reference, celld, input);
+      expect(result.status).toBe("fail");
+      expect(result.error).toContain("broken checker");
+    }
+  }).pipe(
+    Effect.provideService(Transport, {
+      request: () => Effect.die("unused"),
+      websocket: () => Effect.die("unused"),
+    }),
+  ),
+);
+
+it.effect("divergences reject changed or missing compatibility profiles", () =>
+  Effect.gen(function* () {
+    for (const profile of [
+      { compatibilityDate: "2026-08-01" },
+      { compatibilityFlags: ["nodejs_compat"] },
+    ]) {
+      const result = yield* evaluate(divergent, reference, celld, {
+        ...input,
+        ...profile,
+      });
+      expect(result.status).toBe("fail");
+    }
+  }).pipe(
+    Effect.provideService(Transport, {
+      request: () => Effect.die("unused"),
+      websocket: () => Effect.die("unused"),
+    }),
+  ),
+);
+
+it.effect("divergence check and compare interruptions propagate", () =>
+  Effect.gen(function* () {
+    for (const phase of ["check", "compare"] as const) {
+      let waived = false;
+      const broken: TestCase = {
+        ...divergent,
+        check: (value) =>
+          phase === "check" && (value as { value: number }).value !== 42
+            ? Effect.interrupt
+            : Effect.void,
+        compare: () => (phase === "compare" ? Effect.interrupt : Effect.void),
+        divergence: {
+          ...divergent.divergence,
+          check: () =>
+            Effect.sync(() => {
+              waived = true;
+            }),
+        },
+      };
+      const fiber = yield* evaluate(broken, reference, celld, input).pipe(
+        Effect.forkChild,
+      );
+      const exit = yield* Fiber.await(fiber);
+      expect(Exit.isFailure(exit) && Cause.hasInterrupts(exit.cause)).toBe(
+        true,
+      );
+      expect(waived).toBe(false);
+    }
+  }).pipe(
+    Effect.provideService(Transport, {
+      request: () => Effect.die("unused"),
+      websocket: () => Effect.die("unused"),
+    }),
+  ),
 );

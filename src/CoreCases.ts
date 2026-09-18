@@ -148,6 +148,8 @@ export const coreCases: ReadonlyArray<TestCase> = [
     }),
     divergence: {
       celldVersion: "0.5.0",
+      compatibilityDate: "2026-07-30",
+      compatibilityFlags: [],
       source: "https://celld.dev/docs/cloudflare-compat/#cache",
       reason: "celld deliberately implements an always-miss cache",
       reviewDate: "2026-09-18",
@@ -281,6 +283,8 @@ export const coreCases: ReadonlyArray<TestCase> = [
     ...ep("rpc.returned-target", "/rpc/target", { sum: 42 }),
     divergence: {
       celldVersion: "0.5.0",
+      compatibilityDate: "2026-07-30",
+      compatibilityFlags: [],
       source: "https://celld.dev/docs/cloudflare-compat/#rpc",
       reason: "celld cannot transfer an RPC stub across an isolate boundary",
       reviewDate: "2026-09-18",

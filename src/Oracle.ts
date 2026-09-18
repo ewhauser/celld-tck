@@ -41,11 +41,15 @@ export const evaluate = (
           .run(candidate, input)
           .pipe(Effect.timeout("30 seconds"));
         if (test.divergence && candidate.engine === "celld") {
-          if (candidate.version !== test.divergence.celldVersion)
+          if (
+            candidate.version !== test.divergence.celldVersion ||
+            !matchesProfile(input, test.divergence)
+          )
             return yield* Effect.fail(
               new TckError({
                 phase: "divergence",
-                message: "Divergence requires review for this celld version",
+                message:
+                  "Divergence requires review for this celld version/compatibility profile",
               }),
             );
           const conforms = yield* Effect.exit(
@@ -63,6 +67,11 @@ export const evaluate = (
                   "Unexpected compatibility pass; review the documented divergence",
               }),
             );
+          if (
+            Cause.hasInterrupts(conforms.cause) ||
+            Cause.hasDies(conforms.cause)
+          )
+            return yield* Effect.failCause(conforms.cause);
           yield* test.divergence.check(candidateValue);
           status = "divergence";
           return;
@@ -70,12 +79,14 @@ export const evaluate = (
         if (knownBug && candidate.engine === "celld" && knownBugs === "allow") {
           if (
             knownBug.caseId !== test.id ||
-            candidate.version !== knownBug.celldVersion
+            candidate.version !== knownBug.celldVersion ||
+            !matchesProfile(input, knownBug)
           )
             return yield* Effect.fail(
               new TckError({
                 phase: "known-bugs",
-                message: "Known bug requires review for this case/version",
+                message:
+                  "Known bug requires review for this case/version/compatibility profile",
               }),
             );
           const conforms = yield* Effect.exit(
@@ -126,3 +137,15 @@ export const evaluate = (
       ...(Exit.isFailure(exit) ? { error: Cause.pretty(exit.cause) } : {}),
     } satisfies CaseResult;
   });
+
+const matchesProfile = (
+  input: CaseInput,
+  expected: {
+    readonly compatibilityDate: string;
+    readonly compatibilityFlags: readonly string[];
+  },
+) =>
+  input.compatibilityFlags !== undefined &&
+  input.compatibilityDate === expected.compatibilityDate &&
+  JSON.stringify([...(input.compatibilityFlags ?? [])].sort()) ===
+    JSON.stringify([...expected.compatibilityFlags].sort());

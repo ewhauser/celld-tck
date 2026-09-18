@@ -66,8 +66,17 @@ export default {
             const bytes = Buffer.from("hello λ");
             return Response.json({
               sha256: createHash("sha256").update("abc").digest("hex"),
-              gzip: gunzipSync(gzipSync(bytes)).toString(),
-              deflate: inflateSync(deflateSync(bytes)).toString(),
+              gzip: gunzipSync(
+                Buffer.from(
+                  "1f8b08000000000002ffcb48cdc9c95738b71b00396394ce08000000",
+                  "hex",
+                ),
+              ).toString(),
+              gzipBytes: gzipSync(bytes).toString("base64"),
+              deflate: inflateSync(
+                Buffer.from("789ccb48cdc9c95738b71b000f2203be", "hex"),
+              ).toString(),
+              deflateBytes: deflateSync(bytes).toString("base64"),
             });
           }
           default:

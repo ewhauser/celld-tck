@@ -69,6 +69,13 @@ it.effect(
           row("a", 1),
           row("b", 2),
         ]);
+        yield* first.append({ ...intent("b", 4), kind: "observed", seq: 2 });
+        const audited = yield* makeLedger("history");
+        expect(
+          (yield* Effect.exit(
+            checkHistory(yield* audited.read(), [row("a", 1)]),
+          ))._tag,
+        ).toBe("Failure");
         yield* fs.writeFileString(first.path, '{"partial":', { flag: "a" });
         expect((yield* Effect.exit(restarted.read()))._tag).toBe("Failure");
       }).pipe(Effect.provide(artifactsLayer(directory)));
@@ -116,4 +123,35 @@ it.effect(
           "Failure",
         );
     }),
+);
+
+it.effect("observed uncertain writes cannot disappear or change sequence", () =>
+  Effect.gen(function* () {
+    const events: LedgerEvent[] = [
+      intent("a", 1),
+      { ...intent("a", 2), kind: "uncertain" },
+      intent("b", 3),
+    ];
+    yield* checkHistory(events, []);
+    const observed = [
+      ...events,
+      { ...intent("a", 4), kind: "observed" as const, seq: 1 },
+    ];
+    yield* checkHistory(observed, [row("a", 1)]);
+    for (const rows of [[], [row("b", 1), row("a", 2)]])
+      expect((yield* Effect.exit(checkHistory(observed, rows)))._tag).toBe(
+        "Failure",
+      );
+    expect(
+      (yield* Effect.exit(
+        checkHistory(
+          [
+            ...observed,
+            { ...intent("a", 5), kind: "observed" as const, seq: 2 },
+          ],
+          [row("a", 1)],
+        ),
+      ))._tag,
+    ).toBe("Failure");
+  }),
 );

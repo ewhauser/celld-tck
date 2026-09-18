@@ -40,12 +40,16 @@ export class Transport extends Context.Service<
 >()("tck/Transport") {}
 
 export interface CaseInput {
+  readonly compatibilityDate?: string;
+  readonly compatibilityFlags?: readonly string[];
   readonly namespace: string;
   readonly seed: number;
 }
 export interface TestCase {
   readonly divergence?: {
     readonly celldVersion: string;
+    readonly compatibilityDate: string;
+    readonly compatibilityFlags: readonly string[];
     readonly source: string;
     readonly reason: string;
     readonly reviewDate: string;
@@ -111,6 +115,29 @@ export interface RuntimeHandle {
   readonly metadata: Readonly<Record<string, unknown>>;
 }
 export type Profile = "local" | "reference";
+// API-suite provenance is separate from lifecycle suite environment metadata.
+export const ApiEnvironment = Schema.Struct({
+  hostNode: Schema.String,
+  platform: Schema.String,
+  architecture: Schema.String,
+  effect: Schema.String,
+  platformNode: Schema.String,
+  esbuild: Schema.String,
+  referenceOnly: Schema.Boolean,
+  sourceRevision: Schema.optionalKey(Schema.String),
+  dirty: Schema.optionalKey(Schema.NullOr(Schema.Boolean)),
+  lockfileSha256: Schema.optionalKey(Schema.String),
+  fixtures: Schema.Record(
+    Schema.String,
+    Schema.Struct({
+      fixtureSha256: Schema.String,
+      compatibilityDate: Schema.String,
+      compatibilityFlags: Schema.Array(Schema.String),
+      reference: Schema.optionalKey(Schema.Unknown),
+      candidate: Schema.optionalKey(Schema.Unknown),
+    }),
+  ),
+});
 export const Report = Schema.Struct({
   schemaVersion: Schema.Literal(1),
   runId: Schema.String,

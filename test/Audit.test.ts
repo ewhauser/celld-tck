@@ -22,7 +22,7 @@ it.effect(
             node: "celld",
           },
           {
-            kind: "ack",
+            kind: "observed",
             id: "op",
             payload: "payload",
             at: 2,
@@ -63,8 +63,12 @@ it.effect(
         "/history/kv?name=owned-object",
       ]);
       expect(yield* fs.exists(`${directory}/ledger-audit.json`)).toBe(true);
+      const recorded = yield* fs.readFileString(ledger);
+      yield* fs.writeFileString(ledger, recorded.replace('"seq":1', '"seq":2'));
+      expect((yield* Effect.exit(audit))._tag).toBe("Failure");
+      const beforeTruncation = reads.length;
       yield* fs.writeFileString(ledger, '{"truncated":');
       expect((yield* Effect.exit(audit))._tag).toBe("Failure");
-      expect(reads.length).toBe(2);
+      expect(reads.length).toBe(beforeTruncation);
     }).pipe(Effect.provide(NodeServices.layer)),
 );

@@ -16,6 +16,7 @@ import { Coverage, validateCoverage } from "./Coverage.js";
 import { decodeJson } from "./Artifacts.js";
 import {
   Report,
+  ApiEnvironment,
   Transport,
   TckError,
   CaseResult,
@@ -128,7 +129,8 @@ export const runSuite = (options: RunOptions) =>
     let executionCompleted = false;
     const require = createRequire(import.meta.url);
     const environment: Record<string, unknown> = {
-      node: process.version,
+      hostNode: process.version,
+      fixtures: {},
       platform: process.platform,
       architecture: process.arch,
       effect: require("effect/package.json").version,
@@ -187,7 +189,8 @@ export const runSuite = (options: RunOptions) =>
                 compatibilityDate: bundle.compatibilityDate,
                 compatibilityFlags: bundle.config.compatibility_flags,
               };
-              environment[fixture] = groupEnvironment;
+              (environment.fixtures as Record<string, unknown>)[fixture] =
+                groupEnvironment;
               const reference = yield* acquireReference(
                 "reference",
                 bundle,
@@ -233,6 +236,8 @@ export const runSuite = (options: RunOptions) =>
                   {
                     namespace: `${options.runId}-${test.id.replaceAll(".", "-")}`,
                     seed: options.seed,
+                    compatibilityDate: bundle.compatibilityDate,
+                    compatibilityFlags: bundle.config.compatibility_flags,
                   },
                   bugs.expectations.find((entry) => entry.caseId === test.id),
                   options.knownBugs,
@@ -285,7 +290,8 @@ export const runSuite = (options: RunOptions) =>
             seed: options.seed,
             startedAt,
             completedAt: new Date().toISOString(),
-            environment,
+            environment:
+              yield* Schema.decodeUnknownEffect(ApiEnvironment)(environment),
             cases: results,
             counts: Object.fromEntries(
               [

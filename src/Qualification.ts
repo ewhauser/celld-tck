@@ -10,13 +10,7 @@ import {
 } from "effect";
 import { Artifacts, artifactsLayer } from "./Artifacts.js";
 import { buildFixtureFor, sha256 } from "./Build.js";
-import {
-  Transport,
-  TckError,
-  type CaseResult,
-  type Report,
-  type Target,
-} from "./Domain.js";
+import { Transport, TckError, type CaseResult, type Target } from "./Domain.js";
 import { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
 import { Processes } from "./Processes.js";
@@ -27,7 +21,7 @@ import {
   hasStorageFaultEvidence,
   StorageEvent,
 } from "./QualificationOracles.js";
-import { junit } from "./Report.js";
+import { withLifecycleReport } from "./LifecycleReport.js";
 import {
   checkFencedReceipts,
   checkHistory,
@@ -205,6 +199,20 @@ const makeContext = (
         const events = yield* ledger.read();
         const rows = yield* state(node);
         const counts = yield* checkHistory(events, rows);
+        // Persist read evidence before returning: uncertainty ends once a write is observed.
+        yield* Effect.forEach(
+          rows,
+          (row) =>
+            ledger.append({
+              kind: "observed",
+              id: row.id,
+              payload: row.payload,
+              seq: row.seq,
+              at: Date.now(),
+              node,
+            }),
+          { discard: true },
+        ).pipe(Effect.uninterruptible);
         const kv = yield* json("/history/kv", node).pipe(
           Effect.flatMap(Schema.decodeUnknownEffect(HistoryKv)),
         );
@@ -803,155 +811,156 @@ export const runQualification = (options: {
     const errors: string[] = [];
     const environment = {
       suite: options.suite,
-      ...(yield* provenance),
       reference: "none; fault invariants",
       candidates: [] as unknown[],
     };
-    yield* artifacts.json("run.json", { ...options, selected: ids });
-    for (const [index, id] of ids.entries()) {
-      let setupDone = false;
-      const start = Date.now();
-      const outcome = yield* Effect.exit(
-        Effect.scoped(
-          Effect.gen(function* () {
-            const bundle = yield* buildFixtureFor("qualification");
-            // Bucket proofs for S3 fault cases ensure storage faults are on the acknowledgment path.
-            const runtime = yield* acquireLocal(
-              `${options.runId}-${id.replaceAll(".", "-")}`,
-              bundle,
-              (detail) =>
-                Effect.sync(() => {
-                  errors.push(detail);
-                }),
-              true,
-              id.startsWith("faults.storage-") ? "bucket" : "fleet",
-              3,
-              true,
-            );
-            environment.candidates.push(runtime.metadata);
-            const ctx = yield* makeContext(
-              runtime,
-              id.replaceAll(".", "-") + "-" + options.runId.slice(4, 12),
-              options.seed,
-            );
-            setupDone = true;
-            const result = yield* runCase(id, ctx);
-            if (id.startsWith("traffic."))
-              yield* auditLedger({
-                ledger: ctx.ledger.path,
-                endpoint: ctx.targets.celld.baseUrl,
-                name: ctx.name,
-              });
-            if (
-              id === "faults.peer-partition" ||
-              id === "capacity.memory-pressure" ||
-              id === "capacity.insufficient-spare"
-            ) {
-              if (id === "faults.peer-partition") {
-                const partitioned = yield* Schema.decodeUnknownEffect(
-                  Schema.Struct({
-                    partitioned: Schema.Literals(["celld", "celld2", "celld3"]),
+    const work = Effect.gen(function* () {
+      Object.assign(environment, yield* provenance);
+      yield* artifacts.json("run.json", { ...options, selected: ids });
+      for (const [index, id] of ids.entries()) {
+        let setupDone = false;
+        const start = Date.now();
+        const outcome = yield* Effect.exit(
+          Effect.scoped(
+            Effect.gen(function* () {
+              const bundle = yield* buildFixtureFor("qualification");
+              // Bucket proofs for S3 fault cases ensure storage faults are on the acknowledgment path.
+              const runtime = yield* acquireLocal(
+                `${options.runId}-${id.replaceAll(".", "-")}`,
+                bundle,
+                (detail) =>
+                  Effect.sync(() => {
+                    errors.push(detail);
                   }),
-                )(result);
-                const other = ctx.nodes.find(
-                  (node) => node !== partitioned.partitioned,
-                )!;
-                yield* ctx.verify(other);
-                // Docker removes the ephemeral published mapping on disconnect.
-                // Restart only the reconnected owner to restore its public endpoint.
-                if (
-                  (yield* ctx.fleet.inspect(partitioned.partitioned)).State
-                    .Running
-                )
-                  yield* ctx.fleet.kill(partitioned.partitioned);
-                yield* Effect.sleep("11 seconds");
-                yield* ctx.start(partitioned.partitioned);
-              }
-              if (id.startsWith("capacity.")) {
-                yield* Effect.sleep("11 seconds");
-                yield* Effect.forEach(ctx.nodes, ctx.start, {
-                  concurrency: "unbounded",
-                  discard: true,
+                true,
+                id.startsWith("faults.storage-") ? "bucket" : "fleet",
+                3,
+                true,
+              );
+              environment.candidates.push(runtime.metadata);
+              const ctx = yield* makeContext(
+                runtime,
+                id.replaceAll(".", "-") + "-" + options.runId.slice(4, 12),
+                options.seed,
+              );
+              setupDone = true;
+              const result = yield* runCase(id, ctx);
+              if (id.startsWith("traffic."))
+                yield* auditLedger({
+                  ledger: ctx.ledger.path,
+                  endpoint: ctx.targets.celld.baseUrl,
+                  name: ctx.name,
                 });
-              }
-              if (id.startsWith("capacity.")) {
-                const processes = yield* Processes;
-                for (const node of id === "capacity.memory-pressure"
-                  ? ctx.nodes
-                  : ctx.nodes.filter((node) => node !== "celld")) {
-                  const container = yield* ctx.fleet.inspect(node);
-                  const restored = yield* processes.run("docker", [
-                    "inspect",
-                    container.Id,
-                  ]);
-                  yield* artifacts.text(
-                    `${id}-${node}-restored-capacity.json`,
-                    restored.stdout,
-                  );
-                  const parsed = yield* Schema.decodeUnknownEffect(
-                    Schema.fromJsonString(
-                      Schema.Array(
-                        Schema.Struct({
-                          HostConfig: Schema.Struct({ Memory: Schema.Number }),
-                        }),
+              if (
+                id === "faults.peer-partition" ||
+                id === "capacity.memory-pressure" ||
+                id === "capacity.insufficient-spare"
+              ) {
+                if (id === "faults.peer-partition") {
+                  const partitioned = yield* Schema.decodeUnknownEffect(
+                    Schema.Struct({
+                      partitioned: Schema.Literals([
+                        "celld",
+                        "celld2",
+                        "celld3",
+                      ]),
+                    }),
+                  )(result);
+                  const other = ctx.nodes.find(
+                    (node) => node !== partitioned.partitioned,
+                  )!;
+                  yield* ctx.verify(other);
+                  // Docker removes the ephemeral published mapping on disconnect.
+                  // Restart only the reconnected owner to restore its public endpoint.
+                  if (
+                    (yield* ctx.fleet.inspect(partitioned.partitioned)).State
+                      .Running
+                  )
+                    yield* ctx.fleet.kill(partitioned.partitioned);
+                  yield* Effect.sleep("11 seconds");
+                  yield* ctx.start(partitioned.partitioned);
+                }
+                if (id.startsWith("capacity.")) {
+                  yield* Effect.sleep("11 seconds");
+                  yield* Effect.forEach(ctx.nodes, ctx.start, {
+                    concurrency: "unbounded",
+                    discard: true,
+                  });
+                }
+                if (id.startsWith("capacity.")) {
+                  const processes = yield* Processes;
+                  for (const node of id === "capacity.memory-pressure"
+                    ? ctx.nodes
+                    : ctx.nodes.filter((node) => node !== "celld")) {
+                    const container = yield* ctx.fleet.inspect(node);
+                    const restored = yield* processes.run("docker", [
+                      "inspect",
+                      container.Id,
+                    ]);
+                    yield* artifacts.text(
+                      `${id}-${node}-restored-capacity.json`,
+                      restored.stdout,
+                    );
+                    const parsed = yield* Schema.decodeUnknownEffect(
+                      Schema.fromJsonString(
+                        Schema.Array(
+                          Schema.Struct({
+                            HostConfig: Schema.Struct({
+                              Memory: Schema.Number,
+                            }),
+                          }),
+                        ),
                       ),
-                    ),
-                  )(restored.stdout);
-                  yield* equal(parsed[0]!.HostConfig.Memory, 512 * 1024 * 1024);
+                    )(restored.stdout);
+                    yield* equal(
+                      parsed[0]!.HostConfig.Memory,
+                      512 * 1024 * 1024,
+                    );
+                  }
+                }
+                for (const node of ctx.nodes) {
+                  ctx.targets[node] = yield* ctx.fleet.target(node);
+                  yield* ctx.verify(node);
                 }
               }
-              for (const node of ctx.nodes) {
-                ctx.targets[node] = yield* ctx.fleet.target(node);
-                yield* ctx.verify(node);
-              }
-            }
-            return result;
-          }),
-        ).pipe(
-          Effect.provide(artifactsLayer(`${artifacts.directory}/${id}`)),
-          Effect.timeout("8 minutes"),
-        ),
-      );
-      const result: CaseResult = {
-        id,
-        status: Exit.isSuccess(outcome)
-          ? "pass"
-          : setupDone
-            ? "fail"
-            : "infrastructure-error",
-        durationMs: Date.now() - start,
-        ...(Exit.isSuccess(outcome)
-          ? { candidate: outcome.value }
-          : { error: Cause.pretty(outcome.cause) }),
-      };
-      cases[index] = result;
-      yield* artifacts.json(`case-${id}.json`, result);
-      yield* Console.log(`${result.status.toUpperCase()} ${id}`);
-      if (Exit.isFailure(outcome) && Cause.hasInterrupts(outcome.cause)) break;
-    }
-    const report: Report = {
-      schemaVersion: 1,
-      runId: options.runId,
-      profile: options.profile,
-      seed: options.seed,
-      startedAt,
-      completedAt: new Date().toISOString(),
-      environment,
-      cases,
+              return result;
+            }),
+          ).pipe(
+            Effect.provide(artifactsLayer(`${artifacts.directory}/${id}`)),
+            Effect.timeout("8 minutes"),
+          ),
+        );
+        const result: CaseResult = {
+          id,
+          status: Exit.isSuccess(outcome)
+            ? "pass"
+            : setupDone
+              ? "fail"
+              : "infrastructure-error",
+          durationMs: Date.now() - start,
+          ...(Exit.isSuccess(outcome)
+            ? { candidate: outcome.value }
+            : { error: Cause.pretty(outcome.cause) }),
+        };
+        cases[index] = result;
+        yield* artifacts.json(`case-${id}.json`, result);
+        yield* Console.log(`${result.status.toUpperCase()} ${id}`);
+        if (Exit.isFailure(outcome) && Cause.hasInterrupts(outcome.cause))
+          return yield* Effect.failCause(outcome.cause);
+      }
+    });
+    yield* withLifecycleReport(
+      work,
+      {
+        schemaVersion: 1,
+        runId: options.runId,
+        profile: "local",
+        seed: options.seed,
+        startedAt,
+        environment,
+        cases,
+        errors,
+      },
       errors,
-      success:
-        cases.length === ids.length &&
-        cases.every((r) => r.status === "pass") &&
-        !errors.length,
-    };
-    yield* artifacts.json("report.json", report);
-    yield* artifacts.text("junit.xml", junit(report));
-    yield* Console.log(`Evidence: ${artifacts.directory}/report.json`);
-    if (!report.success)
-      return yield* Effect.fail(
-        new TckError({
-          phase: "suite",
-          message: "Qualification failed; inspect retained evidence",
-        }),
-      );
+    );
   });

@@ -47,7 +47,9 @@
           "twice": "accepted",
           "lateClone": "TypeError"
         }
-      }
+      },
+      "compatibilityDate": "2026-07-30",
+      "compatibilityFlags": []
     },
     {
       "caseId": "storage.invalid-input",
@@ -63,7 +65,9 @@
           "limit": "Error",
           "unserializable": "TypeError"
         }
-      }
+      },
+      "compatibilityDate": "2026-07-30",
+      "compatibilityFlags": []
     },
     {
       "caseId": "repro.body-readers",
@@ -201,7 +205,9 @@
             "used": true
           }
         ]
-      }
+      },
+      "compatibilityDate": "2026-07-30",
+      "compatibilityFlags": []
     },
     {
       "caseId": "repro.storage-errors",
@@ -242,7 +248,9 @@
           "absent": true,
           "validLimit": []
         }
-      }
+      },
+      "compatibilityDate": "2026-07-30",
+      "compatibilityFlags": []
     }
   ]
 }

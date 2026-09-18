@@ -14,11 +14,18 @@ const celld = {
   engine: "celld" as const,
   version: "0.5.0",
 };
-const input = { namespace: "test", seed: 42 };
+const input = {
+  compatibilityDate: "2026-07-30",
+  compatibilityFlags: [] as string[],
+  namespace: "test",
+  seed: 42,
+};
 const expectation = {
   caseId: "test",
   bugIds: ["CELL-001"],
   celldVersion: "0.5.0",
+  compatibilityDate: "2026-07-30",
+  compatibilityFlags: [],
   evidenceRun: "test",
   candidate: 0,
 };
@@ -117,4 +124,22 @@ it.effect(
           (yield* Effect.exit(validateBugRegistry(invalid, cases)))._tag,
         ).toBe("Failure");
     }).pipe(Effect.provide(NodeServices.layer)),
+);
+
+it.effect("known bugs reject changed dates and flags", () =>
+  Effect.gen(function* () {
+    for (const profile of [
+      { compatibilityDate: "2026-08-01" },
+      { compatibilityFlags: ["nodejs_compat"] },
+    ])
+      expect(
+        (yield* evaluate(
+          makeTest(),
+          reference,
+          celld,
+          { ...input, ...profile },
+          expectation,
+        )).status,
+      ).toBe("fail");
+  }).pipe(Effect.provideService(Transport, transport)),
 );
