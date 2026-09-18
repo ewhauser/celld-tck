@@ -2,9 +2,17 @@
 
 The suite compares pinned celld v0.5.0 with Miniflare 4.20260730.0 / workerd 1.20260730.1 at compatibility date 2026-07-30. All authored TypeScript uses Effect 4.0.0-rc.115. These are local observations, not AWS or managed Cloudflare qualification.
 
-## Validation
+## Current known-bug policy validation
 
-- `pnpm check`: formatting, three TypeScript projects, and 26 harness tests passed.
+- `pnpm check`: formatting, three TypeScript projects, and 30 harness tests passed.
+- Full local run: **65 passed, 2 divergences, 2 known bugs**, exit 0 (`tck-b3d376f9-1c06-49c1-8919-9f0cdf333d7b`).
+- Reference reproductions: **2 passed**, exit 0 (`tck-e1f63e03-89b2-4b67-a101-206498064bb0`).
+- Local reproductions: **2 known bugs**, exit 0 (`tck-7c0e3f3e-47bd-46ed-9a5f-a759e0d255e1`).
+
+- Strict local reproductions (`--known-bugs error`): **2 failures**, exit 1, no harness errors (`tck-6ca002bf-eac4-4440-8c6c-d6af63908d0f`).
+
+## Original strict baseline
+
 - Reference self-check: **63/63 passed** (`tck-2be81d98-acd3-4f22-92e6-eb0a63c09b3d`).
 - Full local run: **65 passed, 2 documented divergences, 2 failures** across 63 differential cases and 6 deployment checks (`tck-7c8c6cf9-b2f3-4d2d-b2c0-8c21b7fbca7d`). All cases reached terminal results; no case-level infrastructure/reference errors.
 - Exit status is 1 for the local run because the two unexpected differences remain failures. CI has been configured but was not run remotely.
@@ -18,7 +26,13 @@ Evidence is under `artifacts/<run-id>/report.json` and accompanying files; artif
 | `http.body-consumption` | Reading an already-consumed Request body rejects with `TypeError`.                              | A second `.text()` call is accepted. Cloning after consumption still rejects. |
 | `storage.invalid-input` | Negative list limit rejects with `TypeError`; storing a function rejects with `DataCloneError`. | Both operations reject, but with `Error` and `TypeError`, respectively.       |
 
-Both remain strict failures. The suite exits nonzero and preserves the candidate result, reference result, assertion diff, and raw traffic. No baselines were changed to make these pass. The error-type difference is a compatibility observation, not a claim of data loss.
+Both remain semantic contract violations. The [bug registry](BUGS.md) now classifies their exact celld 0.5.0 observations as `known-bug`; default runs allow these results, while `--known-bugs error` preserves strict failure behavior. Unexpected observations remain failures. The error-type difference is a compatibility observation, not a claim of data loss.
+
+## Isolated upstream reproductions
+
+The dedicated `repros` suite passes both cases on the reference self-check and reproduces both violations against celld v0.5.0, with no setup or cleanup errors. Current default runs classify both as known bugs. It confirms repeated consumption for all five readers on both Request and Response, incorrect `bodyUsed` after reading null bodies, and storage error-class differences in asynchronous, synchronous, and batch operations. The rejected batch produced no partial writes.
+
+[Three prepared upstream reports](upstream/README.md) include minimal reproductions, pinned source analysis, repair boundaries, and checked-in observations. They remain local drafts; no upstream fix or issue submission is claimed.
 
 ## Documented divergences
 

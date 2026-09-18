@@ -27,6 +27,7 @@ import { Processes } from "./Processes.js";
 import { acquireLocal } from "./Local.js";
 import { equal, evaluate } from "./Oracle.js";
 import { acquireReference } from "./Reference.js";
+import { BugRegistry, validateBugRegistry } from "./KnownBugs.js";
 import { junit } from "./Report.js";
 
 export interface RunOptions {
@@ -35,6 +36,7 @@ export interface RunOptions {
   readonly seed: number;
   readonly caseId: string;
   readonly suite?: Suite;
+  readonly knownBugs?: "allow" | "error";
 }
 export const selectCases = (caseId: string, suite: Suite = "all") =>
   Effect.gen(function* () {
@@ -78,6 +80,17 @@ export const runSuite = (options: RunOptions) =>
       ),
     );
     yield* validateCoverage(cases, coverage);
+    const bugs = yield* decodeJson(
+      BugRegistry,
+      yield* fs.readFileString(
+        new URL("../docs/bugs.json", import.meta.url).pathname,
+      ),
+    );
+    yield* validateBugRegistry(bugs, cases);
+    yield* artifacts.json("bugs.json", {
+      ...bugs,
+      policy: options.knownBugs ?? "allow",
+    });
     yield* artifacts.json("coverage.json", {
       ...coverage,
       selected: selected.map((test) => test.id),
@@ -157,7 +170,12 @@ export const runSuite = (options: RunOptions) =>
         yield* Console.log(
           `Building Effect fixtures; profile=${options.profile}, seed=${options.seed}`,
         );
-        for (const fixture of ["core", "node", "extensions"] as const) {
+        for (const fixture of [
+          "core",
+          "node",
+          "extensions",
+          "repro",
+        ] as const) {
           if (!selected.some((test) => (test.fixture ?? "core") === fixture))
             continue;
           yield* Effect.scoped(
@@ -216,6 +234,8 @@ export const runSuite = (options: RunOptions) =>
                     namespace: `${options.runId}-${test.id.replaceAll(".", "-")}`,
                     seed: options.seed,
                   },
+                  bugs.expectations.find((entry) => entry.caseId === test.id),
+                  options.knownBugs,
                 );
                 results[index] = result;
                 yield* artifacts.json(`case-${test.id}.json`, result);
@@ -239,7 +259,9 @@ export const runSuite = (options: RunOptions) =>
           errors.length ||
           results.some(
             (result) =>
-              result.status !== "pass" && result.status !== "divergence",
+              result.status !== "pass" &&
+              result.status !== "divergence" &&
+              result.status !== "known-bug",
           )
         )
           return Effect.fail(
@@ -270,6 +292,7 @@ export const runSuite = (options: RunOptions) =>
                 "pass",
                 "fail",
                 "divergence",
+                "known-bug",
                 "reference-error",
                 "infrastructure-error",
               ].map((status) => [
@@ -283,7 +306,9 @@ export const runSuite = (options: RunOptions) =>
               errors.length === 0 &&
               results.every(
                 (result) =>
-                  result.status === "pass" || result.status === "divergence",
+                  result.status === "pass" ||
+                  result.status === "divergence" ||
+                  result.status === "known-bug",
               ),
           });
           yield* artifacts.json("report.json", report);

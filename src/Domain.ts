@@ -52,7 +52,7 @@ export interface TestCase {
     readonly owner: string;
     readonly check: (value: unknown) => Effect.Effect<void, TckError>;
   };
-  readonly fixture?: "core" | "node" | "extensions";
+  readonly fixture?: "core" | "node" | "extensions" | "repro";
   readonly id: string;
   readonly contract: string;
   readonly run: (
@@ -73,12 +73,14 @@ export const CaseResult = Schema.Struct({
   status: Schema.Literals([
     "pass",
     "divergence",
+    "known-bug",
     "fail",
     "reference-error",
     "infrastructure-error",
   ]),
   durationMs: Schema.Number,
   divergence: Schema.optionalKey(Schema.String),
+  knownBugs: Schema.optionalKey(Schema.Array(Schema.String)),
   reference: Schema.optionalKey(Schema.Unknown),
   candidate: Schema.optionalKey(Schema.Unknown),
   error: Schema.optionalKey(Schema.String),

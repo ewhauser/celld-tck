@@ -42,3 +42,33 @@ it.effect(
       );
     }),
 );
+
+it.effect(
+  "reports known bugs as skipped with identifiers rather than passes",
+  () =>
+    Effect.sync(() => {
+      const output = junit({
+        schemaVersion: 1,
+        runId: "test",
+        profile: "local",
+        seed: 0,
+        startedAt: "now",
+        completedAt: "now",
+        environment: {},
+        errors: [],
+        success: true,
+        cases: [
+          {
+            id: "x",
+            status: "known-bug",
+            durationMs: 1,
+            knownBugs: ["CELL-001", "CELL-002"],
+          },
+        ],
+      });
+      expect(output).toContain('failures="0" errors="0" skipped="1"');
+      expect(output).toContain(
+        '<skipped message="Known bugs: CELL-001, CELL-002"/>',
+      );
+    }),
+);

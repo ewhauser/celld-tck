@@ -8,6 +8,8 @@ import {
   type TestCase,
 } from "./Domain.js";
 
+import type { KnownBugExpectation } from "./KnownBugs.js";
+
 export const equal = (actual: unknown, expected: unknown) =>
   Effect.try({
     try: () => deepStrictEqual(actual, expected),
@@ -20,6 +22,8 @@ export const evaluate = (
   reference: Target,
   candidate: Target,
   input: CaseInput,
+  knownBug?: KnownBugExpectation,
+  knownBugs: "allow" | "error" = "allow",
 ) =>
   Effect.gen(function* () {
     const start = yield* Clock.currentTimeMillis;
@@ -63,6 +67,41 @@ export const evaluate = (
           status = "divergence";
           return;
         }
+        if (knownBug && candidate.engine === "celld" && knownBugs === "allow") {
+          if (
+            knownBug.caseId !== test.id ||
+            candidate.version !== knownBug.celldVersion
+          )
+            return yield* Effect.fail(
+              new TckError({
+                phase: "known-bugs",
+                message: "Known bug requires review for this case/version",
+              }),
+            );
+          const conforms = yield* Effect.exit(
+            test
+              .check(candidateValue, input)
+              .pipe(
+                Effect.andThen(test.compare(referenceValue, candidateValue)),
+              ),
+          );
+          if (Exit.isSuccess(conforms))
+            return yield* Effect.fail(
+              new TckError({
+                phase: "known-bugs",
+                message:
+                  "Unexpected compatibility pass; retire the known-bug expectation",
+              }),
+            );
+          if (
+            Cause.hasInterrupts(conforms.cause) ||
+            Cause.hasDies(conforms.cause)
+          )
+            return yield* Effect.failCause(conforms.cause);
+          yield* equal(candidateValue, knownBug.candidate);
+          status = "known-bug";
+          return;
+        }
         yield* test.check(candidateValue, input);
         yield* test.compare(referenceValue, candidateValue);
         status = "pass";
@@ -77,6 +116,9 @@ export const evaluate = (
         ? {
             divergence: `${test.divergence?.reason} (${test.divergence?.source})`,
           }
+        : {}),
+      ...((status as CaseResult["status"]) === "known-bug" && knownBug
+        ? { knownBugs: knownBug.bugIds }
         : {}),
       durationMs: (yield* Clock.currentTimeMillis) - start,
       ...(referenceValue === undefined ? {} : { reference: referenceValue }),

@@ -11,5 +11,10 @@
     "types": [],
     "noEmit": true
   },
-  "include": ["core/**/*.ts", "shared/**/*.ts", "extensions/**/*.ts"]
+  "include": [
+    "core/**/*.ts",
+    "shared/**/*.ts",
+    "extensions/**/*.ts",
+    "repro/**/*.ts"
+  ]
 }

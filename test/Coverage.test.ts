@@ -62,3 +62,18 @@ it.effect("rejects lost updates even if the final counter is correct", () =>
     ).toBe(true);
   }),
 );
+
+it.effect("keeps diagnostic reproductions outside the default corpus", () =>
+  Effect.gen(function* () {
+    const defaults = yield* selectCases("");
+    const repros = yield* selectCases("", "repros");
+    expect(defaults).toHaveLength(63);
+    expect(defaults.every((test) => test.fixture !== "repro")).toBe(true);
+    expect(repros.map((test) => test.id)).toEqual([
+      "repro.body-readers",
+      "repro.storage-errors",
+    ]);
+    expect(repros.every((test) => test.fixture === "repro")).toBe(true);
+    expect(cases).toHaveLength(defaults.length + repros.length);
+  }),
+);

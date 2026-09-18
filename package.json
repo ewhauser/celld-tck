@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:reference": "tsx src/main.ts --profile reference",
     "test:local": "tsx src/main.ts --profile local",
-    "types:fixtures": "wrangler types --config fixtures/core/wrangler.jsonc fixtures/core/worker-configuration.d.ts && wrangler types --config fixtures/extensions/wrangler.jsonc --env-interface ExtensionEnv --include-runtime=false fixtures/extensions/worker-configuration.d.ts",
+    "types:fixtures": "wrangler types --config fixtures/core/wrangler.jsonc fixtures/core/worker-configuration.d.ts && wrangler types --config fixtures/extensions/wrangler.jsonc --env-interface ExtensionEnv --include-runtime=false fixtures/extensions/worker-configuration.d.ts && wrangler types --config fixtures/repro/wrangler.jsonc --env-interface ReproEnv --include-runtime=false fixtures/repro/worker-configuration.d.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p fixtures/tsconfig.json && tsc --noEmit -p fixtures/node/tsconfig.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

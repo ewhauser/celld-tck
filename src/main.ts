@@ -22,7 +22,11 @@ const cli = Command.make(
       "bindings",
       "node",
       "extensions",
+      "repros",
     ]).pipe(Flag.withDefault("all")),
+    knownBugs: Flag.Literals("known-bugs", ["allow", "error"]).pipe(
+      Flag.withDefault("allow"),
+    ),
     seed: Flag.Int("seed").pipe(Flag.withDefault(42)),
     caseId: Flag.String("case").pipe(Flag.withDefault("")),
     output: Flag.String("output").pipe(Flag.withDefault("artifacts")),

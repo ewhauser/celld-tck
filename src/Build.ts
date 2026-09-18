@@ -10,7 +10,9 @@ import { FixtureConfig } from "./FixtureConfig.js";
 export const sha256 = (value: string | Uint8Array) =>
   createHash("sha256").update(value).digest("hex");
 
-export const buildFixtureFor = (fixture: "core" | "node" | "extensions") =>
+export const buildFixtureFor = (
+  fixture: "core" | "node" | "extensions" | "repro",
+) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const artifacts = yield* Artifacts;
@@ -20,7 +22,7 @@ export const buildFixtureFor = (fixture: "core" | "node" | "extensions") =>
       FixtureConfig,
       yield* fs.readFileString(
         new URL(
-          `../fixtures/${fixture === "extensions" ? "extensions" : "core"}/wrangler.jsonc`,
+          `../fixtures/${fixture === "node" ? "core" : fixture}/wrangler.jsonc`,
           import.meta.url,
         ).pathname,
       ),

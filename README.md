@@ -15,7 +15,7 @@ pnpm test:reference
 pnpm test:local
 ```
 
-`test:reference` runs two independently persisted workerd instances; it validates the harness and expectations. `test:local` compares workerd with actual celld backed by MinIO using bucket durability. A failed compatibility case makes the command exit nonzero, while the remaining cases continue. **A complete test suite does not imply that celld passes it.** See [docs/FINDINGS.md](docs/FINDINGS.md) for the observed differences.
+`test:reference` runs two independently persisted workerd instances; it validates the harness and expectations. `test:local` compares workerd with actual celld backed by MinIO using bucket durability. An unexpected failed compatibility case makes the command exit nonzero, while the remaining cases continue. Exact version-scoped [known bugs](docs/BUGS.md) are reported separately and do not fail the default run; use `--known-bugs error` for strict enforcement. **A complete test suite does not imply that celld passes it.** See [docs/FINDINGS.md](docs/FINDINGS.md) for the observed differences.
 
 ```sh
 pnpm tck --profile local --suite bindings
@@ -29,11 +29,13 @@ Suites:
 
 | Suite           | Coverage                                                                                                                                                                                               |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `all` (default) | Every differential case, with separate deployments for compatibility profiles                                                                                                                          |
+| `all` (default) | All 63 conformance cases, with separate deployments for compatibility profiles                                                                                                                         |
 | `core`          | HTTP bodies/headers/forms/encoding/redirects/abort, identity, async and synchronous storage, SQL, concurrency gates, DO RPC, alarms, streams, WebSockets, crypto, HTMLRewriter, cache, background work |
 | `bindings`      | Named service RPC, KV, D1, R2, Queue batch/ack/retry, Workflow steps/sleep/retry/events                                                                                                                |
 | `node`          | Buffer, paths/events, async context, hashing and compression under `nodejs_compat`                                                                                                                     |
 | `extensions`    | Static assets, compiled WebAssembly, Dynamic Workers, facet storage/isolation                                                                                                                          |
+
+The explicit `repros` suite contains two additional isolated diagnostic cases for the current upstream failures. See [prepared upstream reports](docs/upstream/README.md) for reproductions, source analysis, and retained observations. These cases are excluded from the default `all` suite.
 
 The six deployment checks run whenever the local run includes the core fixture (`core` or `bindings` cases). They validate a successful dry run, then rejection of routes, unsupported bindings, invalid names, legacy migrations, and a missing DO class. A generic Docker error cannot satisfy an expected rejection. These celld-specific checks do not run in the reference self-check.
 
@@ -51,7 +53,7 @@ Reports record tool versions, source revision and dirty state, compatibility fla
 
 Assertions preserve ordering where it is part of the contract. The rich-value observation codec distinguishes missing/undefined/null, BigInt, special numbers, byte views, ArrayBuffer, Date, Map, and Set; it rejects unsupported or cyclic observations explicitly. Concurrent increment cases validate every state transition rather than only the final counter. Alarms, Queue delivery, and Workflows use real runtime execution and bounded polling; no reference-only event injection is used.
 
-The cache and returned-RPC-target cases have documented, version-scoped divergences: celld implements an always-miss cache and rejects transferring RPC stubs across isolates. Each is reported as `divergence` in JSON and skipped with an explanation in JUnit, never as a compatibility pass. An unexpected pass, a changed divergent result, or a different celld version fails and requires review. Undocumented mismatches remain failures.
+The cache and returned-RPC-target cases have documented, version-scoped divergences: celld implements an always-miss cache and rejects transferring RPC stubs across isolates. Each is reported as `divergence` in JSON and skipped with an explanation in JUnit, never as a compatibility pass. An unexpected pass, a changed divergent result, or a different celld version fails and requires review. Other registered bugs are reported as `known-bug`, with exact version and observation checks described in [docs/BUGS.md](docs/BUGS.md). Unregistered mismatches remain failures.
 
 The coverage manifest is checked against the executable catalog before provisioning. Missing or duplicated cases fail validation. Every selected case starts with an infrastructure-error placeholder; an unexecuted case can never disappear or pass. Cases do not retry after failures. Only readiness and observable asynchronous completion use bounded polling. Per-request deadline: 10 seconds; each case side: 30 seconds; complete run: 10 minutes. Responses are limited to 1 MiB and command output to 8 MiB per stream.
 
@@ -68,7 +70,7 @@ Finalizers collect logs and remove owned Docker resources on success, failure, a
 - Miniflare **4.20260730.0**, workerd **1.20260730.1**, compatibility date **2026-07-30**. Base fixtures have no Node compatibility flag; Node tests are a separate profile.
 - celld **v0.5.0**, MinIO **RELEASE.2025-09-07T16-13-09Z**, and `mc` **RELEASE.2025-08-13T08-35-41Z**, pinned by image digest in [infra/compose.yaml](infra/compose.yaml).
 
-`pnpm check` runs formatting, host/base/Node fixture type checks, and Effect tests for the oracle, codec, coverage, configuration rejection, reports, cleanup, and reference process isolation. Regenerate binding declarations with `pnpm types:fixtures`. CI runs the reference and local suites and uploads evidence even on failure. A known failing upstream compatibility case is not automatically waived in CI.
+`pnpm check` runs formatting, host/base/Node fixture type checks, and Effect tests for the oracle, codec, coverage, configuration rejection, reports, cleanup, and reference process isolation. Regenerate binding declarations with `pnpm types:fixtures`. CI runs the reference and local suites and uploads evidence even on failure. CI uses the reviewed known-bug registry; adding a waiver requires an explicit registry change.
 
 Add cases in `src/CoreCases.ts`, `ServiceCases.ts`, `NodeCases.ts`, or `ExtensionCases.ts`; add their IDs to `docs/coverage.json`. Assertions belong in the driver. Fixtures perform platform operations and expose observations. Keep unknown-data validation at boundaries, use Effect services and scopes, and adapt Promise APIs only at their platform boundary. See [AGENTS.md](AGENTS.md) and [docs/DESIGN.md](docs/DESIGN.md).
 

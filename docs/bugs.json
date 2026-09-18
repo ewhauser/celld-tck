@@ -1,0 +1,248 @@
+{
+  "bugs": [
+    {
+      "id": "CELL-001",
+      "title": "Body readers allow repeated consumption and mark null bodies used",
+      "status": "open",
+      "report": "upstream/body-consumption.md",
+      "owner": "celld-tck maintainers",
+      "reviewedAt": "2026-09-18",
+      "upstreamIssue": null
+    },
+    {
+      "id": "CELL-002",
+      "title": "Negative storage list limits throw Error instead of TypeError",
+      "status": "open",
+      "report": "upstream/storage-list-validation.md",
+      "owner": "celld-tck maintainers",
+      "reviewedAt": "2026-09-18",
+      "upstreamIssue": null
+    },
+    {
+      "id": "CELL-003",
+      "title": "Uncloneable storage values throw TypeError instead of DataCloneError",
+      "status": "open",
+      "report": "upstream/storage-clone-errors.md",
+      "owner": "celld-tck maintainers",
+      "reviewedAt": "2026-09-18",
+      "upstreamIssue": null
+    }
+  ],
+  "expectations": [
+    {
+      "caseId": "http.body-consumption",
+      "bugIds": ["CELL-001"],
+      "celldVersion": "0.5.0",
+      "evidenceRun": "tck-7c8c6cf9-b2f3-4d2d-b2c0-8c21b7fbca7d",
+      "candidate": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "before": false,
+          "after": true,
+          "text": "\u03bb\ud83c\udf0d",
+          "cloned": "\u03bb\ud83c\udf0d",
+          "twice": "accepted",
+          "lateClone": "TypeError"
+        }
+      }
+    },
+    {
+      "caseId": "storage.invalid-input",
+      "bugIds": ["CELL-002", "CELL-003"],
+      "celldVersion": "0.5.0",
+      "evidenceRun": "tck-7c8c6cf9-b2f3-4d2d-b2c0-8c21b7fbca7d",
+      "candidate": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "limit": "Error",
+          "unserializable": "TypeError"
+        }
+      }
+    },
+    {
+      "caseId": "repro.body-readers",
+      "bugIds": ["CELL-001"],
+      "celldVersion": "0.5.0",
+      "evidenceRun": "tck-fdff5d81-b4bf-45b9-a651-debe3808879d",
+      "candidate": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": [
+          {
+            "kind": "Request",
+            "method": "text",
+            "before": false,
+            "after": true,
+            "second": {
+              "outcome": "accepted",
+              "name": null,
+              "domException": false
+            }
+          },
+          {
+            "kind": "Request",
+            "method": "json",
+            "before": false,
+            "after": true,
+            "second": {
+              "outcome": "accepted",
+              "name": null,
+              "domException": false
+            }
+          },
+          {
+            "kind": "Request",
+            "method": "arrayBuffer",
+            "before": false,
+            "after": true,
+            "second": {
+              "outcome": "accepted",
+              "name": null,
+              "domException": false
+            }
+          },
+          {
+            "kind": "Request",
+            "method": "blob",
+            "before": false,
+            "after": true,
+            "second": {
+              "outcome": "accepted",
+              "name": null,
+              "domException": false
+            }
+          },
+          {
+            "kind": "Request",
+            "method": "formData",
+            "before": false,
+            "after": true,
+            "second": {
+              "outcome": "accepted",
+              "name": null,
+              "domException": false
+            }
+          },
+          {
+            "kind": "Request",
+            "method": "null-body-control",
+            "first": "",
+            "second": "",
+            "used": true
+          },
+          {
+            "kind": "Response",
+            "method": "text",
+            "before": false,
+            "after": true,
+            "second": {
+              "outcome": "accepted",
+              "name": null,
+              "domException": false
+            }
+          },
+          {
+            "kind": "Response",
+            "method": "json",
+            "before": false,
+            "after": true,
+            "second": {
+              "outcome": "accepted",
+              "name": null,
+              "domException": false
+            }
+          },
+          {
+            "kind": "Response",
+            "method": "arrayBuffer",
+            "before": false,
+            "after": true,
+            "second": {
+              "outcome": "accepted",
+              "name": null,
+              "domException": false
+            }
+          },
+          {
+            "kind": "Response",
+            "method": "blob",
+            "before": false,
+            "after": true,
+            "second": {
+              "outcome": "accepted",
+              "name": null,
+              "domException": false
+            }
+          },
+          {
+            "kind": "Response",
+            "method": "formData",
+            "before": false,
+            "after": true,
+            "second": {
+              "outcome": "accepted",
+              "name": null,
+              "domException": false
+            }
+          },
+          {
+            "kind": "Response",
+            "method": "null-body-control",
+            "first": "",
+            "second": "",
+            "used": true
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "repro.storage-errors",
+      "bugIds": ["CELL-002", "CELL-003"],
+      "celldVersion": "0.5.0",
+      "evidenceRun": "tck-fdff5d81-b4bf-45b9-a651-debe3808879d",
+      "candidate": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "asyncLimit": {
+            "outcome": "rejected",
+            "name": "Error",
+            "domException": false
+          },
+          "syncLimit": {
+            "outcome": "rejected",
+            "name": "Error",
+            "domException": false
+          },
+          "asyncPut": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          },
+          "syncPut": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          },
+          "batchPut": {
+            "outcome": "rejected",
+            "name": "TypeError",
+            "domException": false
+          },
+          "absent": true,
+          "validLimit": []
+        }
+      }
+    }
+  ]
+}

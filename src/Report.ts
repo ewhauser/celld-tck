@@ -16,11 +16,13 @@ export const junit = (report: Report): string => {
     report.errors.length;
   const tests = report.cases.map((result) => {
     const problem =
-      result.status === "divergence"
-        ? `<skipped message="${xml(result.divergence ?? "Documented divergence")}"/>`
-        : result.status === "pass"
-          ? ""
-          : `<${result.status === "fail" ? "failure" : "error"} message="${xml(result.status)}">${xml(result.error ?? "No observation")}</${result.status === "fail" ? "failure" : "error"}>`;
+      result.status === "known-bug"
+        ? `<skipped message="${xml(`Known bugs: ${result.knownBugs?.join(", ")}`)}"/>`
+        : result.status === "divergence"
+          ? `<skipped message="${xml(result.divergence ?? "Documented divergence")}"/>`
+          : result.status === "pass"
+            ? ""
+            : `<${result.status === "fail" ? "failure" : "error"} message="${xml(result.status)}">${xml(result.error ?? "No observation")}</${result.status === "fail" ? "failure" : "error"}>`;
     return `  <testcase name="${xml(result.id)}" classname="celld-tck.${report.profile}" time="${result.durationMs / 1000}">${problem}</testcase>`;
   });
   report.errors.forEach((error, index) =>
@@ -28,5 +30,5 @@ export const junit = (report: Report): string => {
       `  <testcase name="harness.${index}"><error>${xml(error)}</error></testcase>`,
     ),
   );
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="celld-tck" tests="${tests.length}" failures="${failures}" errors="${errors}" skipped="${report.cases.filter((result) => result.status === "divergence").length}">\n${tests.join("\n")}\n</testsuite>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="celld-tck" tests="${tests.length}" failures="${failures}" errors="${errors}" skipped="${report.cases.filter((result) => result.status === "divergence" || result.status === "known-bug").length}">\n${tests.join("\n")}\n</testsuite>\n`;
 };
