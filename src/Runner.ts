@@ -1,9 +1,8 @@
 import { waitForReady } from "./Polling.js";
 import { Console, Effect, FileSystem, Schema } from "effect";
-import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { Artifacts, artifactsLayer } from "./Artifacts.js";
-import { buildFixtureFor, sha256 } from "./Build.js";
+import { buildFixtureFor } from "./Build.js";
 import { cases, suites, type Suite } from "./Catalog.js";
 import { Coverage, validateCoverage } from "./Coverage.js";
 import { decodeJson } from "./Artifacts.js";
@@ -16,8 +15,8 @@ import {
   type Target,
 } from "./Domain.js";
 import { rejectionConfigs } from "./DeploymentChecks.js";
-import { Processes } from "./Processes.js";
 import { acquireLocal } from "./Local.js";
+import { provenance } from "./Provenance.js";
 import { equal, evaluate } from "./Oracle.js";
 import { acquireReference } from "./Reference.js";
 import { BugRegistry, validateBugRegistry } from "./KnownBugs.js";
@@ -100,15 +99,8 @@ export const runSuite = (options: RunOptions) =>
             ...rejectionConfigs.map((test) => test.id),
           ]
         : [];
-    const require = createRequire(import.meta.url);
     const environment: Record<string, unknown> = {
-      hostNode: process.version,
       fixtures: {},
-      platform: process.platform,
-      architecture: process.arch,
-      effect: require("effect/package.json").version,
-      platformNode: require("@effect/platform-node/package.json").version,
-      esbuild: require("esbuild/package.json").version,
       referenceOnly: options.profile === "reference",
     };
     const executor = yield* makeSuiteExecutor({
@@ -119,22 +111,7 @@ export const runSuite = (options: RunOptions) =>
       timeout: "10 minutes",
     });
     const work = Effect.gen(function* () {
-      const processes = yield* Processes;
-      const revision = yield* processes.run("git", ["rev-parse", "HEAD"]).pipe(
-        Effect.map((output) => output.stdout.trim()),
-        Effect.catch(() => Effect.succeed("unavailable")),
-      );
-      environment.sourceRevision = revision;
-      environment.dirty = yield* processes
-        .run("git", ["status", "--porcelain"])
-        .pipe(
-          Effect.map((output) => output.stdout.trim().length > 0),
-          Effect.catch(() => Effect.succeed(null)),
-        );
-      const lockfile = yield* fs.readFileString(
-        new URL("../pnpm-lock.yaml", import.meta.url).pathname,
-      );
-      environment.lockfileSha256 = sha256(lockfile);
+      Object.assign(environment, yield* provenance);
       yield* artifacts.json("run.json", {
         ...options,
         selected: selected.map((test) => ({

@@ -18,7 +18,7 @@ export const provenance = Effect.gen(function* () {
   return {
     sourceRevision: revision,
     dirty,
-    node: process.version,
+    hostNode: process.version,
     platform: process.platform,
     architecture: process.arch,
     effect: require("effect/package.json").version,

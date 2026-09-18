@@ -6,6 +6,7 @@ import { TckError, type Target } from "./Domain.js";
 import { DiskContainer, DiskVolume, ownedStateVolume } from "./DiskLoss.js";
 import { equal } from "./Oracle.js";
 import { cleanupAll } from "./Resources.js";
+import { inspectService, mcCat, publishedPort } from "./Compose.js";
 export const Node = Schema.Literals(["celld", "celld2", "celld3"]);
 export type Node = typeof Node.Type;
 export const Owner = Schema.Struct({ node: Node, epoch: Schema.Int });
@@ -23,8 +24,7 @@ export const fleetControls = (
     const paused = new Set<Node>();
     const inspect = (node: Node) =>
       Effect.gen(function* () {
-        const id = (yield* compose(["ps", "--all", "-q", node])).stdout.trim();
-        const raw = (yield* processes.run("docker", ["inspect", id])).stdout;
+        const raw = yield* inspectService(compose, processes, node);
         yield* artifacts.text(`fleet-${++sequence}-${node}.json`, raw);
         const entries = yield* decodeJson(
           Schema.Array(
@@ -62,14 +62,13 @@ export const fleetControls = (
       });
     const target = (node: Node) =>
       Effect.gen(function* () {
-        const address = (yield* compose(["port", node, "8080"])).stdout.trim();
-        if (!/^127\.0\.0\.1:\d+$/.test(address))
-          return yield* Effect.fail(
-            new TckError({
-              phase: "fleet",
-              message: "Invalid public endpoint",
-            }),
-          );
+        const address = yield* publishedPort(
+          compose,
+          node,
+          "8080",
+          "fleet",
+          "Invalid public endpoint",
+        );
         return { ...base, name: node, baseUrl: `http://${address}` };
       });
     yield* Effect.addFinalizer(() =>
@@ -95,16 +94,8 @@ export const fleetControls = (
         }),
       lease: (node: Node) =>
         Effect.gen(function* () {
-          const raw = (yield* compose([
-            "run",
-            "--rm",
-            "-T",
-            "--entrypoint",
-            "mc",
-            "storage",
-            "cat",
-            `local/tck/nodes/${node}.json`,
-          ])).stdout;
+          const raw = (yield* mcCat(compose, `local/tck/nodes/${node}.json`))
+            .stdout;
           yield* artifacts.text(`lease-${++sequence}-${node}.json`, raw);
           return yield* decodeJson(
             Schema.Struct({
@@ -135,10 +126,18 @@ export const fleetControls = (
             "inspect",
             `${project}_${node}-state`,
           ])).stdout;
-          const volume = (yield* decodeJson(
+          const volumes = yield* decodeJson(
             Schema.Array(DiskVolume),
             volumesRaw,
-          ))[0]!;
+          );
+          if (volumes.length !== 1)
+            return yield* Effect.fail(
+              new TckError({
+                phase: "lifecycle",
+                message: "Expected one state volume",
+              }),
+            );
+          const volume = volumes[0]!;
           const name = yield* ownedStateVolume(
             project,
             container,
@@ -160,6 +159,15 @@ export const fleetControls = (
           yield* compose(["rm", "--force", node]);
           yield* processes.run("docker", ["volume", "rm", name]);
           yield* compose(["create", node]);
+          const replacement = yield* inspect(node);
+          if (replacement.Id === current.Id)
+            return yield* Effect.fail(
+              new TckError({
+                phase: "lifecycle",
+                message: "Container was not replaced",
+              }),
+            );
+          // Verify the recreated disk is empty before any node process can use it.
           yield* compose([
             "run",
             "--no-deps",
@@ -177,6 +185,11 @@ export const fleetControls = (
             volume: name,
             emptyBeforeStart: true,
           });
+          return {
+            volume: name,
+            oldContainer: current.Id,
+            newContainer: replacement.Id,
+          };
         }),
       losses: () =>
         Effect.gen(function* () {
@@ -208,16 +221,7 @@ export const fleetControls = (
                   message: "Invalid loss-record path",
                 }),
               );
-            const raw = (yield* compose([
-              "run",
-              "--rm",
-              "-T",
-              "--entrypoint",
-              "mc",
-              "storage",
-              "cat",
-              path,
-            ])).stdout;
+            const raw = (yield* mcCat(compose, path)).stdout;
             yield* artifacts.text(`loss-record-${++sequence}.json`, raw);
             records.push(
               yield* decodeJson(
@@ -243,16 +247,10 @@ export const fleetControls = (
                 message: "Invalid cell identity",
               }),
             );
-          const raw = (yield* compose([
-            "run",
-            "--rm",
-            "-T",
-            "--entrypoint",
-            "mc",
-            "storage",
-            "cat",
+          const raw = (yield* mcCat(
+            compose,
             `local/tck/cells/Recovery:${cell}/own.json`,
-          ])).stdout;
+          )).stdout;
           yield* artifacts.text(`owner-${++sequence}.json`, raw);
           return yield* decodeJson(Owner, raw);
         }),
