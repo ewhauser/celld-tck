@@ -81,8 +81,23 @@ export const acquireLocal = (options: LocalOptions) =>
         }),
       );
     const composeCommand = selected;
-    const composePath = new URL("../infra/compose.yaml", import.meta.url)
-      .pathname;
+    // Compose merges later files over earlier ones, so this order is load-bearing.
+    // Every selected overlay is also copied into the evidence bundle.
+    const overlays = (
+      [
+        ["compose.yaml", true],
+        ["storage-proxy.yaml", true],
+        ["multinode.yaml", multiNode],
+        ["fleet.yaml", durability === "fleet"],
+        ["three-node.yaml", multiNode && nodeCount === 3],
+        ["qualification.yaml", qualification],
+      ] as const
+    )
+      .filter(([, enabled]) => enabled)
+      .map(([name]) => ({
+        name,
+        path: new URL(`../infra/${name}`, import.meta.url).pathname,
+      }));
     const compose = (args: ReadonlyArray<string>) =>
       processes.run(
         composeCommand.file,
@@ -90,115 +105,47 @@ export const acquireLocal = (options: LocalOptions) =>
           ...composeCommand.prefix,
           "--project-name",
           runId,
-          "--file",
-          composePath,
-          "--file",
-          new URL("../infra/storage-proxy.yaml", import.meta.url).pathname,
-          ...(multiNode
-            ? [
-                "--file",
-                new URL("../infra/multinode.yaml", import.meta.url).pathname,
-              ]
-            : []),
-          ...(durability === "fleet"
-            ? [
-                "--file",
-                new URL("../infra/fleet.yaml", import.meta.url).pathname,
-              ]
-            : []),
-          ...(multiNode && nodeCount === 3
-            ? [
-                "--file",
-                new URL("../infra/three-node.yaml", import.meta.url).pathname,
-              ]
-            : []),
-          ...(qualification
-            ? [
-                "--file",
-                new URL("../infra/qualification.yaml", import.meta.url)
-                  .pathname,
-              ]
-            : []),
+          ...overlays.flatMap((overlay) => ["--file", overlay.path]),
           ...args,
         ],
         { TCK_FIXTURE_DIR: bundle.directory, TCK_DURABILITY: durability },
       );
-    yield* artifacts.text(
-      "compose.yaml",
-      yield* fs.readFileString(composePath),
-    );
-    if (multiNode)
+    for (const overlay of overlays)
       yield* artifacts.text(
-        "multinode.yaml",
-        yield* fs.readFileString(
-          new URL("../infra/multinode.yaml", import.meta.url).pathname,
-        ),
+        overlay.name,
+        yield* fs.readFileString(overlay.path),
       );
-    if (durability === "fleet")
-      yield* artifacts.text(
-        "fleet.yaml",
-        yield* fs.readFileString(
-          new URL("../infra/fleet.yaml", import.meta.url).pathname,
-        ),
-      );
-    if (multiNode && nodeCount === 3)
-      yield* artifacts.text(
-        "three-node.yaml",
-        yield* fs.readFileString(
-          new URL("../infra/three-node.yaml", import.meta.url).pathname,
-        ),
-      );
-    {
-      yield* Effect.tryPromise({
-        try: () =>
-          build({
-            entryPoints: [
-              new URL("./StorageProxy.ts", import.meta.url).pathname,
-            ],
-            bundle: true,
-            platform: "node",
-            format: "esm",
-            outfile: resolve(bundle.directory, "proxy.mjs"),
-          }),
-        catch: (error) =>
-          new TckError({ phase: "build", message: String(error) }),
-      });
-      yield* artifacts.text(
-        "storage-proxy.yaml",
-        yield* fs.readFileString(
-          new URL("../infra/storage-proxy.yaml", import.meta.url).pathname,
-        ),
-      );
-    }
-    if (qualification) {
-      yield* artifacts.text(
-        "qualification.yaml",
-        yield* fs.readFileString(
-          new URL("../infra/qualification.yaml", import.meta.url).pathname,
-        ),
-      );
-    }
+    yield* Effect.tryPromise({
+      try: () =>
+        build({
+          entryPoints: [new URL("./StorageProxy.ts", import.meta.url).pathname],
+          bundle: true,
+          platform: "node",
+          format: "esm",
+          outfile: resolve(bundle.directory, "proxy.mjs"),
+        }),
+      catch: (error) =>
+        new TckError({ phase: "build", message: String(error) }),
+    });
     return yield* owned(
       Effect.gen(function* () {
         yield* compose(["up", "-d", "minio"]);
         yield* compose(["run", "--rm", "-T", "storage"]);
-        {
-          yield* compose(["up", "-d", "proxy"]);
-          yield* compose([
-            "exec",
-            "-T",
-            "proxy",
-            "node",
-            "--input-type=module",
-            "-e",
-            'const response = await fetch("http://127.0.0.1:9091/stats"); if (!response.ok) process.exitCode = 1;',
-          ]).pipe(
-            Effect.retry({
-              schedule: Schedule.spaced("200 millis"),
-              times: 20,
-            }),
-          );
-        }
+        yield* compose(["up", "-d", "proxy"]);
+        yield* compose([
+          "exec",
+          "-T",
+          "proxy",
+          "node",
+          "--input-type=module",
+          "-e",
+          'const response = await fetch("http://127.0.0.1:9091/stats"); if (!response.ok) process.exitCode = 1;',
+        ]).pipe(
+          Effect.retry({
+            schedule: Schedule.spaced("200 millis"),
+            times: 20,
+          }),
+        );
         const diagnosis = yield* compose([
           "run",
           "--rm",
@@ -502,12 +449,7 @@ export const acquireLocal = (options: LocalOptions) =>
                 return { ...target, baseUrl: `http://${endpoint}` };
               }),
           },
-          target: {
-            name: "candidate",
-            baseUrl: `http://${address}`,
-            engine: "celld",
-            version: version.replace(/^celld\s+/, ""),
-          },
+          target,
           controls: {
             compose,
             proxy: () =>
