@@ -14,7 +14,7 @@ import {
   type Profile,
   type Target,
 } from "./Domain.js";
-import { rejectionConfigs } from "./DeploymentChecks.js";
+import { deploymentIds as allDeploymentIds } from "./DeploymentChecks.js";
 import { acquireLocal } from "./Local.js";
 import { provenance } from "./Provenance.js";
 import { equal, evaluate } from "./Oracle.js";
@@ -94,10 +94,7 @@ export const runSuite = (options: RunOptions) =>
     const deploymentIds =
       options.profile === "local" &&
       selected.some((test) => (test.fixture ?? "core") === "core")
-        ? [
-            "deployment.valid-config",
-            ...rejectionConfigs.map((test) => test.id),
-          ]
+        ? allDeploymentIds
         : [];
     const environment: Record<string, unknown> = {
       fixtures: {},

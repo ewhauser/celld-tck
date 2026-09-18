@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { cases, suites } from "../Catalog.js";
-import { rejectionConfigs } from "../DeploymentChecks.js";
+import { deploymentIds } from "../DeploymentChecks.js";
 import { recoveryIds } from "../Recovery.js";
 import { multinodeIds } from "../Multinode.js";
 import { qualificationIds } from "../Qualification.js";
@@ -25,10 +25,6 @@ export const Run = Schema.Struct({
 });
 export type Run = typeof Run.Type;
 const apiIds = suites.all.map((test) => test.id);
-const deploymentIds = [
-  "deployment.valid-config",
-  ...rejectionConfigs.map((test) => test.id),
-];
 export const definitions: readonly {
   key: string;
   label: string;

@@ -32,6 +32,11 @@ export const rejectionConfigs = [
   },
 ] as const;
 
+export const deploymentIds = [
+  "deployment.valid-config",
+  ...rejectionConfigs.map((test) => test.id),
+];
+
 export const checkDeployment = (
   bundle: Bundle,
   compose: (
