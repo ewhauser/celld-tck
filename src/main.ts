@@ -16,6 +16,13 @@ const cli = Command.make(
     profile: Flag.Literals("profile", ["local", "reference"]).pipe(
       Flag.withDefault("local"),
     ),
+    suite: Flag.Literals("suite", [
+      "all",
+      "core",
+      "bindings",
+      "node",
+      "extensions",
+    ]).pipe(Flag.withDefault("all")),
     seed: Flag.Int("seed").pipe(Flag.withDefault(42)),
     caseId: Flag.String("case").pipe(Flag.withDefault("")),
     output: Flag.String("output").pipe(Flag.withDefault("artifacts")),
@@ -29,7 +36,7 @@ const cli = Command.make(
             message: "Seed must be an unsigned 32-bit integer",
           }),
         );
-      yield* selectCases(options.caseId);
+      yield* selectCases(options.caseId, options.suite);
       const runId = `tck-${yield* Effect.sync(() => randomUUID())}`;
       const services = Layer.mergeAll(processesLayer, transportLayer).pipe(
         Layer.provideMerge(artifactsLayer(resolve(options.output, runId))),

@@ -3,3 +3,5 @@ pnpm-lock.yaml
 .wrangler/
 artifacts/
 fixtures/core/worker-configuration.d.ts
+
+fixtures/extensions/worker-configuration.d.ts

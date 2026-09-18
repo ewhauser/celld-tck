@@ -4,7 +4,11 @@ import { resolve } from "node:path";
 import { Artifacts, decodeJson } from "./Artifacts.js";
 import { TckError, type Bundle, type RuntimeHandle } from "./Domain.js";
 
+import { FixtureConfig } from "./FixtureConfig.js";
+
 export const ReferenceConfig = Schema.Struct({
+  config: FixtureConfig,
+  modules: Schema.Record(Schema.String, Schema.String),
   name: Schema.String,
   scriptPath: Schema.String,
   directory: Schema.String,
@@ -31,6 +35,8 @@ export const acquireReference = (
     yield* fs.makeDirectory(directory, { recursive: true });
     yield* artifacts.json(`${name}/config.json`, {
       name,
+      config: bundle.config,
+      modules: bundle.modules,
       directory,
       scriptPath: resolve(bundle.directory, "worker.js"),
       sha256: bundle.sha256,

@@ -9,6 +9,8 @@ export class TckError extends Data.TaggedError("TckError")<{
 export const Target = Schema.Struct({
   name: Schema.String,
   baseUrl: Schema.String,
+  engine: Schema.optionalKey(Schema.Literals(["celld", "workerd"])),
+  version: Schema.optionalKey(Schema.String),
 });
 export type Target = typeof Target.Type;
 export const Observation = Schema.Struct({
@@ -26,6 +28,10 @@ export interface RequestSpec {
 export class Transport extends Context.Service<
   Transport,
   {
+    readonly websocket: (
+      target: Target,
+      path: string,
+    ) => Effect.Effect<unknown, TckError>;
     readonly request: (
       target: Target,
       spec: RequestSpec,
@@ -38,6 +44,15 @@ export interface CaseInput {
   readonly seed: number;
 }
 export interface TestCase {
+  readonly divergence?: {
+    readonly celldVersion: string;
+    readonly source: string;
+    readonly reason: string;
+    readonly reviewDate: string;
+    readonly owner: string;
+    readonly check: (value: unknown) => Effect.Effect<void, TckError>;
+  };
+  readonly fixture?: "core" | "node" | "extensions";
   readonly id: string;
   readonly contract: string;
   readonly run: (
@@ -57,11 +72,13 @@ export const CaseResult = Schema.Struct({
   id: Schema.String,
   status: Schema.Literals([
     "pass",
+    "divergence",
     "fail",
     "reference-error",
     "infrastructure-error",
   ]),
   durationMs: Schema.Number,
+  divergence: Schema.optionalKey(Schema.String),
   reference: Schema.optionalKey(Schema.Unknown),
   candidate: Schema.optionalKey(Schema.Unknown),
   error: Schema.optionalKey(Schema.String),
@@ -69,6 +86,10 @@ export const CaseResult = Schema.Struct({
 export type CaseResult = typeof CaseResult.Type;
 
 export interface Bundle {
+  readonly modules: Readonly<Record<string, string>>;
+  readonly config: Schema.Schema.Type<
+    typeof import("./FixtureConfig.js").FixtureConfig
+  >;
   readonly directory: string;
   readonly source: string;
   readonly sha256: string;
@@ -90,6 +111,7 @@ export const Report = Schema.Struct({
   environment: Schema.Record(Schema.String, Schema.Unknown),
   cases: Schema.Array(CaseResult),
   errors: Schema.Array(Schema.String),
+  counts: Schema.optionalKey(Schema.Record(Schema.String, Schema.Int)),
   success: Schema.Boolean,
 });
 export type Report = typeof Report.Type;

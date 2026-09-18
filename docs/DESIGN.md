@@ -1,6 +1,6 @@
 # celld API compatibility test kit
 
-Status: design, September 18, 2026. The first implementation milestone now runs on Effect v4 RC, with four local/reference cases and scoped cleanup. The broader profiles and coverage below remain planned. No cloud resources have been created. See the root README for implemented commands.
+Status: implemented local API corpus, September 18, 2026. The Effect v4 runner now has 63 differential cases and 6 celld-specific deployment checks, across base-Web, Node-compatibility, and extension fixture deployments. The executable coverage contract is [coverage.json](coverage.json); [FINDINGS.md](FINDINGS.md) records validation results and differences. API-suite implementation does not mean the candidate conforms. AWS adapters, managed Cloudflare qualification, and distributed lifecycle/fault testing remain separate work. No cloud resources have been created.
 
 ## Decision
 
@@ -110,7 +110,7 @@ interface CaseDefinition {
 }
 ```
 
-These interfaces are sketches, not implemented exports. `Target` is a transport view with endpoints and authentication; it does not expose deployment credentials. Optional lifecycle control is a separate interface used only by lifecycle cases. Each acquired environment supplies an exclusive deployment lease, cleanup policy, and resource inventory. Adapters may translate binding declarations but cannot change test assertions or application module bytes.
+These interfaces describe the architectural boundaries; concrete exports are in `src/Domain.ts`, `Build.ts`, `Reference.ts`, and `Local.ts`. `Target` is a transport view with endpoints and authentication; it does not expose deployment credentials. Optional lifecycle control is a separate interface used only by lifecycle cases. Each acquired environment supplies an exclusive deployment lease, cleanup policy, and resource inventory. Adapters may translate binding declarations but cannot change test assertions or application module bytes.
 
 ## Fixture packaging and isolation
 
@@ -167,7 +167,7 @@ Known divergences are narrow records keyed by case, celld version, and compatibi
 | WebSockets          | Upgrade, text/binary messages, close, attachment state                                          | Protocol/state invariants                  |
 | Deployment          | Supported bindings/config, missing bindings, unsupported config/API rejection                   | Success/rejection contract                 |
 
-Then add KV, D1, R2 bindings, Queues, Workflows, Node compatibility, Web Crypto, assets, wasm, and facets as separate coverage groups. Prioritize Queues and named RPC early for the consuming workflow application. Keep application/framework conformance tests separate from runtime API cases so failures have a clear owner.
+KV, D1, R2 bindings, Queues, Workflows, Node compatibility, Web Crypto, assets, wasm, and facets now have executable coverage groups. The checked-in manifest lists the exact cases; a family entry does not claim every method or edge case is exhausted. Prioritize Queues and named RPC early for the consuming workflow application. Keep application/framework conformance tests separate from runtime API cases so failures have a clear owner.
 
 Hibernation/restart scenarios extend the lifecycle group. A forced process restart is not proof of WebSocket hibernation behavior; report unsupported lifecycle controls explicitly. Containers/Sandbox require a separate optional profile and are not implied by running the celld server in Docker.
 
@@ -179,14 +179,15 @@ Produce human-readable results, machine-readable JSON, and JUnit, with separate 
 
 Each evidence bundle includes case IDs, seed, source revision, fixture hashes, runtime versions, image digests/architecture, capability manifest, durability mode, storage backend, node count, rendered non-secret configuration, raw and normalized observations, comparator diff, and runtime logs. Capture diagnostic artifacts before teardown and redact credentials. Report cleanup failures without hiding the original test result.
 
-The proposed CLI below is illustrative; these commands do not exist yet:
+Current commands:
 
 ```sh
-pnpm tck run --profile local --suite core
-pnpm tck run --profile local-fleet --suite core
-pnpm tck run --profile s3 --suite core
-pnpm tck run --profile aws --environment ./test-fleet.json --suite core
-pnpm tck run --profile local --case storage.transaction-rollback --seed 42
+pnpm tck --profile local --suite all
+pnpm tck --profile reference --suite all
+pnpm tck --profile local --suite bindings
+pnpm tck --profile local --suite node
+pnpm tck --profile local --suite extensions
+pnpm tck --profile local --case storage.transaction-rollback --seed 42
 ```
 
 PR gate: reference/candidate core conformance on Docker/MinIO and unit tests of the harness itself. Extended local jobs: other API families and multiple node routing. Explicit or scheduled cloud qualification: real S3, then EC2/S3 using the same cases. Baseline updates require review of actual diffs; runtime upgrades never automatically rewrite expectations.
@@ -198,7 +199,7 @@ PR gate: reference/candidate core conformance on Docker/MinIO and unit tests of 
 3. **Portability proof:** execute the same three slice cases with local celld against S3, then against an attached dedicated AWS fleet. No edits to case source or assertions; only environment configuration changes.
 4. **Broader API/lifecycle coverage:** add asynchronous service families and lifecycle controls with explicit reference capability limits. Keep reliability/fault testing a separate suite even when it shares provisioning and artifacts.
 
-The first milestone should demonstrate correctness of the harness before growing the corpus. Avoid committing to a test-count target that rewards redundant cases over observable behaviors.
+Milestones 1 and 2 now have a working local implementation, with additional service and extension API cases from milestone 4. Milestone 3 and lifecycle controls remain unimplemented. The first milestone demonstrated correctness of the harness before growing the corpus. Avoid committing to a test-count target that rewards redundant cases over observable behaviors.
 
 ## Source notes
 

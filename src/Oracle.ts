@@ -36,6 +36,33 @@ export const evaluate = (
         candidateValue = yield* test
           .run(candidate, input)
           .pipe(Effect.timeout("30 seconds"));
+        if (test.divergence && candidate.engine === "celld") {
+          if (candidate.version !== test.divergence.celldVersion)
+            return yield* Effect.fail(
+              new TckError({
+                phase: "divergence",
+                message: "Divergence requires review for this celld version",
+              }),
+            );
+          const conforms = yield* Effect.exit(
+            test
+              .check(candidateValue, input)
+              .pipe(
+                Effect.andThen(test.compare(referenceValue, candidateValue)),
+              ),
+          );
+          if (Exit.isSuccess(conforms))
+            return yield* Effect.fail(
+              new TckError({
+                phase: "divergence",
+                message:
+                  "Unexpected compatibility pass; review the documented divergence",
+              }),
+            );
+          yield* test.divergence.check(candidateValue);
+          status = "divergence";
+          return;
+        }
         yield* test.check(candidateValue, input);
         yield* test.compare(referenceValue, candidateValue);
         status = "pass";
@@ -46,6 +73,11 @@ export const evaluate = (
     return {
       id: test.id,
       status,
+      ...((status as CaseResult["status"]) === "divergence"
+        ? {
+            divergence: `${test.divergence?.reason} (${test.divergence?.source})`,
+          }
+        : {}),
       durationMs: (yield* Clock.currentTimeMillis) - start,
       ...(referenceValue === undefined ? {} : { reference: referenceValue }),
       ...(candidateValue === undefined ? {} : { candidate: candidateValue }),

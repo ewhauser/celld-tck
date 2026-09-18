@@ -1,0 +1,64 @@
+import { expect, it } from "@effect/vitest";
+import { Effect, Exit } from "effect";
+import { cases } from "../src/Catalog.js";
+import { validateCoverage, Coverage } from "../src/Coverage.js";
+import { decodeJson } from "../src/Artifacts.js";
+import { NodeServices } from "@effect/platform-node";
+import { FileSystem } from "effect";
+import { selectCases } from "../src/Runner.js";
+it.effect("requires every declared case exactly once", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const manifest = yield* decodeJson(
+      Coverage,
+      yield* fs.readFileString("docs/coverage.json"),
+    );
+    yield* validateCoverage(cases, manifest);
+    expect(
+      Exit.isFailure(
+        yield* Effect.exit(validateCoverage(cases.slice(1), manifest)),
+      ),
+    ).toBe(true);
+    expect(
+      Exit.isFailure(
+        yield* Effect.exit(validateCoverage([...cases, cases[0]!], manifest)),
+      ),
+    ).toBe(true);
+  }).pipe(Effect.provide(NodeServices.layer)),
+);
+it.effect(
+  "rejects missing cases and selection outside the selected suite",
+  () =>
+    Effect.gen(function* () {
+      expect(Exit.isFailure(yield* Effect.exit(selectCases("not-real")))).toBe(
+        true,
+      );
+      expect(
+        Exit.isFailure(yield* Effect.exit(selectCases("node.buffer", "core"))),
+      ).toBe(true);
+      expect(
+        (yield* selectCases("", "node")).every(
+          (test) => test.fixture === "node",
+        ),
+      ).toBe(true);
+    }),
+);
+it.effect("rejects lost updates even if the final counter is correct", () =>
+  Effect.gen(function* () {
+    const test = cases.find((test) => test.id === "concurrency.input-gates")!;
+    const history = Array.from({ length: 12 }, (_, i) => ({
+      status: 200,
+      body: { before: i, after: i + 1, initialized: true },
+    }));
+    yield* test.check(history, { namespace: "test", seed: 42 });
+    const corrupt = history.map((row) => ({ ...row, body: { ...row.body } }));
+    corrupt[1]!.body.before = 0;
+    expect(
+      Exit.isFailure(
+        yield* Effect.exit(
+          test.check(corrupt, { namespace: "test", seed: 42 }),
+        ),
+      ),
+    ).toBe(true);
+  }),
+);

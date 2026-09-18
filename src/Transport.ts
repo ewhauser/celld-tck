@@ -1,5 +1,6 @@
 import { Cause, Effect, Layer, Schema, Stream } from "effect";
 import { HttpClient, HttpClientRequest } from "effect/unstable/http";
+import { converse } from "./WebSocket.js";
 import { Artifacts, decodeJson } from "./Artifacts.js";
 import { Transport, TckError, type Observation } from "./Domain.js";
 
@@ -10,6 +11,11 @@ export const transportLayer = Layer.effect(
     const artifacts = yield* Artifacts;
     let sequence = 0;
     return {
+      websocket: (target, path) => {
+        const url = new URL(path, target.baseUrl);
+        url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+        return converse(url.href, artifacts.json);
+      },
       request: (target, spec) =>
         Effect.suspend(() => {
           const id = ++sequence;
@@ -68,8 +74,12 @@ export const transportLayer = Layer.effect(
               if (value !== undefined) headers[name] = value;
             }
             const body = headers["content-type"]?.includes("application/json")
-              ? yield* decodeJson(Schema.Unknown, text)
-              : text;
+              ? yield* decodeJson(Schema.Unknown, text).pipe(
+                  Effect.catch(() => Effect.succeed({ invalidJson: text })),
+                )
+              : headers["content-type"] === "application/octet-stream"
+                ? [...bytes]
+                : text;
             return {
               status: response.status,
               headers,

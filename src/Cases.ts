@@ -9,12 +9,12 @@ import {
 import { equal } from "./Oracle.js";
 
 const jsonHeaders = { "content-type": "application/json" };
-const response = (
+export const response = (
   body: unknown,
   status = 200,
   headers: Record<string, string> = jsonHeaders,
 ): Observation => ({ status, headers, body });
-const call = (
+export const call = (
   target: Target,
   input: CaseInput,
   path: string,
@@ -36,7 +36,7 @@ const call = (
           }),
     });
   });
-const define = (
+export const define = (
   id: string,
   run: TestCase["run"],
   expected: (input: CaseInput) => unknown,
@@ -57,7 +57,7 @@ const storedValue = (input: CaseInput) => ({
   nested: [input.seed, "x"],
 });
 
-export const cases: ReadonlyArray<TestCase> = [
+export const initialCases: ReadonlyArray<TestCase> = [
   {
     ...define(
       "http.request-response",

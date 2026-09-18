@@ -1,5 +1,6 @@
 import { Effect, Exit, FileSystem, Schema } from "effect";
 import { resolve } from "node:path";
+import { checkDeployment } from "./DeploymentChecks.js";
 import { Artifacts, decodeJson } from "./Artifacts.js";
 import { sha256 } from "./Build.js";
 import { TckError, type Bundle, type RuntimeHandle } from "./Domain.js";
@@ -86,6 +87,9 @@ export const acquireLocal = (
           "--json",
         ]);
         yield* artifacts.text("diagnose.jsonl", diagnosis.stdout);
+        const deploymentChecks = runId.endsWith("-core")
+          ? yield* checkDeployment(bundle, compose)
+          : [];
         const deployed = yield* compose([
           "run",
           "--rm",
@@ -128,6 +132,29 @@ export const acquireLocal = (
               message: "Uploaded fixture bytes differ from reference artifact",
             }),
           );
+        for (const [name, hash] of Object.entries(bundle.modules)) {
+          if (!name.endsWith(".wasm")) continue;
+          const wasmKey = `local/tck/deploy/${deployment.worker}/${deployment.version}/${name}`;
+          const result = yield* compose([
+            "run",
+            "--rm",
+            "-T",
+            "--entrypoint",
+            "/bin/sh",
+            "storage",
+            "-ec",
+            'mc cat "$1" | sha256sum',
+            "verify-module",
+            wasmKey,
+          ]);
+          if (result.stdout.trim().split(/\s+/)[0] !== hash)
+            return yield* Effect.fail(
+              new TckError({
+                phase: "deployment",
+                message: `Uploaded module differs: ${name}`,
+              }),
+            );
+        }
         const version = (yield* compose([
           "run",
           "--rm",
@@ -163,8 +190,14 @@ export const acquireLocal = (
           platform: entry.Platform,
         }));
         return {
-          target: { name: "candidate", baseUrl: `http://${address}` },
+          target: {
+            name: "candidate",
+            baseUrl: `http://${address}`,
+            engine: "celld",
+            version: version.replace(/^celld\s+/, ""),
+          },
           metadata: {
+            deploymentChecks,
             engine: "celld",
             version,
             project: runId,

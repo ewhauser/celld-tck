@@ -20,6 +20,19 @@ const program = Effect.scoped(
       ReferenceConfig,
       yield* fs.readFileString(path),
     );
+    for (const [name, hash] of Object.entries(config.modules)) {
+      if (
+        sha256(
+          yield* fs.readFile(resolve(dirname(config.scriptPath), name)),
+        ) !== hash
+      )
+        return yield* Effect.fail(
+          new TckError({
+            phase: "reference",
+            message: `Module hash mismatch: ${name}`,
+          }),
+        );
+    }
     const source = yield* fs.readFileString(config.scriptPath);
     if (sha256(source) !== config.sha256)
       return yield* Effect.fail(
@@ -34,11 +47,77 @@ const program = Effect.scoped(
           new Miniflare({
             name: "celld-tck-core",
             modules: true,
+            modulesRules: [{ type: "CompiledWasm", include: ["**/*.wasm"] }],
+            ...(config.config.assets
+              ? {
+                  assets: {
+                    directory: resolve(
+                      dirname(config.scriptPath),
+                      config.config.assets.directory,
+                    ),
+                    binding: config.config.assets.binding,
+                    routerConfig: {
+                      has_user_worker: true,
+                      invoke_user_worker_ahead_of_assets: true,
+                    },
+                  },
+                }
+              : {}),
             modulesRoot: dirname(config.scriptPath),
             script: source,
             scriptPath: config.scriptPath,
             compatibilityDate: config.compatibilityDate,
-            compatibilityFlags: [],
+            compatibilityFlags: [...config.config.compatibility_flags],
+            kvNamespaces: Object.fromEntries(
+              (config.config.kv_namespaces ?? []).map((b) => [b.binding, b.id]),
+            ),
+            d1Databases: Object.fromEntries(
+              (config.config.d1_databases ?? []).map((b) => [
+                b.binding,
+                b.database_id,
+              ]),
+            ),
+            r2Buckets: Object.fromEntries(
+              (config.config.r2_buckets ?? []).map((b) => [
+                b.binding,
+                b.bucket_name,
+              ]),
+            ),
+            serviceBindings: Object.fromEntries(
+              (config.config.services ?? []).map((b) => [
+                b.binding,
+                { name: b.service, entrypoint: b.entrypoint },
+              ]),
+            ),
+            queueProducers: Object.fromEntries(
+              (config.config.queues?.producers ?? []).map((b) => [
+                b.binding,
+                b.queue,
+              ]),
+            ),
+            queueConsumers: Object.fromEntries(
+              (config.config.queues?.consumers ?? []).map((b) => [
+                b.queue,
+                {
+                  maxBatchSize: b.max_batch_size,
+                  maxBatchTimeout: b.max_batch_timeout,
+                  maxRetries: b.max_retries,
+                  retryDelay: b.retry_delay,
+                },
+              ]),
+            ),
+            workflows: Object.fromEntries(
+              (config.config.workflows ?? []).map((b) => [
+                b.binding,
+                { name: b.name, className: b.class_name },
+              ]),
+            ),
+            workerLoaders: Object.fromEntries(
+              (config.config.worker_loaders ?? []).map((b) => [b.binding, {}]),
+            ),
+            kvPersist: resolve(config.directory, "kv"),
+            d1Persist: resolve(config.directory, "d1"),
+            r2Persist: resolve(config.directory, "r2"),
             durableObjects: {
               [config.binding.name]: {
                 className: config.binding.className,

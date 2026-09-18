@@ -1,21 +1,12 @@
 # celld-tck
 
-An independent API compatibility test kit for celld. Identical Worker/Durable Object bundles run on workerd and real celld; an external Effect-based driver checks the documented behavior of each before comparing their observations.
+An independent API compatibility test kit for celld, written in **Effect v4 RC.115**. Identical Worker/Durable Object bundles run on workerd and real celld. The external driver checks each engine against semantic expectations before comparing observations.
 
-The first slice is implemented. Four cases cover HTTP request/response semantics, storage CRUD/list ordering and object isolation, asynchronous storage transaction rollback, and synchronous SQL transaction rollback. This is a starting corpus, not complete Cloudflare compatibility or distributed durability qualification.
-
-## Stack
-
-- Effect, `@effect/platform-node`, and `@effect/vitest`: **4.0.0-rc.115**, pinned together.
-- TypeScript 7, Node.js **24.21.0**, pnpm **11.15.0**.
-- Miniflare **4.20260730.0** / workerd **1.20260730.1**, using compatibility date **2026-07-30** with no Node compatibility flag. This intentionally pins a stable reference rather than the newer Miniflare alpha.
-- celld **v0.5.0**, MinIO **RELEASE.2025-09-07T16-13-09Z**, and `mc` **RELEASE.2025-08-13T08-35-41Z**, pinned by image digest in [infra/compose.yaml](infra/compose.yaml).
-
-All authored TypeScript workflows use Effect. The runner uses services/Layers, Schema decoding, scoped processes, HTTP deadlines, and cleanup finalizers. Each Miniflare runtime runs in a managed child process: its immediate-exit signal handlers cannot bypass the driver's cleanup. Worker handlers and third-party APIs are the Promise boundaries. SQLite transaction callbacks remain synchronous. Generated Cloudflare type declarations are not application implementation.
+The local API corpus contains **63 differential cases plus 6 celld deployment checks**. It covers the API families in [docs/coverage.json](docs/coverage.json). This is a versioned contract corpus, not an exhaustive proof for every API input or distributed schedule. AWS provisioning, multi-node recovery, container/Sandbox APIs, and managed Cloudflare qualification are separate work.
 
 ## Run
 
-Install Node and pnpm at the versions above. For the local profile, start a Docker daemon and install Docker Compose. The runner accepts the `docker compose` plugin or `docker-compose`; `TCK_COMPOSE_BIN` can point to a standalone executable. A project-local `.cache/tools/docker-compose` is also recognized. No cloud credentials are required.
+Use Node **24.21.0** and pnpm **11.15.0**. Start Docker for the local profile. The runner accepts `docker compose` or `docker-compose`; `TCK_COMPOSE_BIN` can point to a standalone executable. A project-local `.cache/tools/docker-compose` is also recognized. No cloud credentials are needed.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -24,52 +15,61 @@ pnpm test:reference
 pnpm test:local
 ```
 
-- `test:reference`: two independently persisted workerd instances. This verifies the test harness; it makes no celld claim.
-- `test:local`: workerd versus one real celld container backed by MinIO, using bucket durability.
-
-Run one case or change the deterministic input seed:
+`test:reference` runs two independently persisted workerd instances; it validates the harness and expectations. `test:local` compares workerd with actual celld backed by MinIO using bucket durability. A failed compatibility case makes the command exit nonzero, while the remaining cases continue. **A complete test suite does not imply that celld passes it.** See [docs/FINDINGS.md](docs/FINDINGS.md) for the observed differences.
 
 ```sh
+pnpm tck --profile local --suite bindings
+pnpm tck --profile reference --suite extensions
 pnpm tck --profile local --case storage.transaction-rollback --seed 123
 pnpm tck --profile reference --output ./artifacts
 pnpm tck --help
 ```
 
-Case IDs:
+Suites:
 
-- `http.request-response`
-- `storage.round-trip`
-- `storage.transaction-rollback`
-- `sql.transaction-rollback`
+| Suite           | Coverage                                                                                                                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `all` (default) | Every differential case, with separate deployments for compatibility profiles                                                                                                                          |
+| `core`          | HTTP bodies/headers/forms/encoding/redirects/abort, identity, async and synchronous storage, SQL, concurrency gates, DO RPC, alarms, streams, WebSockets, crypto, HTMLRewriter, cache, background work |
+| `bindings`      | Named service RPC, KV, D1, R2, Queue batch/ack/retry, Workflow steps/sleep/retry/events                                                                                                                |
+| `node`          | Buffer, paths/events, async context, hashing and compression under `nodejs_compat`                                                                                                                     |
+| `extensions`    | Static assets, compiled WebAssembly, Dynamic Workers, facet storage/isolation                                                                                                                          |
 
-The build bundles Effect into the fixture once. Both engines receive the same bytes; the local adapter reads celld's uploaded module back from MinIO and verifies its SHA-256 against the reference artifact. Readiness includes a real DO storage write/read. MinIO conditional-write diagnostics must pass before deployment; celld also performs its normal startup checks.
+The six deployment checks run whenever the local run includes the core fixture (`core` or `bindings` cases). They validate a successful dry run, then rejection of routes, unsupported bindings, invalid names, legacy migrations, and a missing DO class. A generic Docker error cannot satisfy an expected rejection. These celld-specific checks do not run in the reference self-check.
 
-Each run owns a unique Compose project, private network, volumes, and reference storage directory. Only the public application listener is published, on an ephemeral loopback port. The MinIO credentials are disposable local test credentials. Finalizers collect logs and remove that run's Docker resources on success, failure, or handled SIGINT/SIGTERM. As with any process, SIGKILL or a host crash cannot execute finalizers. The report and command log identify the project for recovery; never use a global Docker prune.
-
-## Evidence and failure behavior
+## Contracts and evidence
 
 Each run writes `artifacts/tck-<uuid>/`:
 
-- `report.json` and `junit.xml`: all selected cases, infrastructure/reference errors, and cleanup failures.
-- `case-*.json`: observations, assertion differences, and status per case.
-- `http.jsonl`: request records and full response headers/body bytes, before comparison filtering.
-- `commands.jsonl`, `diagnose.jsonl`, `deployment.json`, and runtime logs.
-- `fixture/`: built JavaScript, SHA-256, build metadata, and rendered configuration.
-- Reference runtime configuration and retained SQLite state.
+- `report.json`, `junit.xml`: all selected cases, documented divergences, infrastructure/reference errors, and cleanup failures.
+- `coverage.json`, `run.json`: declared coverage, explicit exclusions, selected/unselected IDs, seed, and version-scoped divergence records.
+- `commands.jsonl`, `http.jsonl`, and `websocket-*.json`: raw process/HTTP/protocol evidence.
+- `core/`, `node/`, `extensions/`: per-deployment case records, fixture modules/hashes, rendered config, runtime logs, diagnosis, and retained reference state.
+- `core/deployment-checks.json`: celld-specific configuration observations.
 
-The report records Effect/runtime versions, image digests, host architecture, durability mode, and lockfile/fixture hashes. Ordered outputs stay ordered. Tests are not automatically retried. Only infrastructure readiness uses bounded retries. The HTTP request limit is 10 seconds, each case side 30 seconds, and the run 5 minutes; cleanup is separately bounded and cleanup failures make the run fail. Responses are limited to 1 MiB and child-process output to 8 MiB per stream.
+Reports record tool versions, source revision and dirty state, compatibility flags, image IDs, storage mode, architecture, and lockfile/fixture hashes. The build includes Effect in each fixture. Both runtimes receive the same JavaScript and wasm modules; the local adapter verifies the uploaded module hashes. Readiness includes a real DO storage write/read. Storage diagnostics must pass before deployment.
 
-The comparison uses only explicitly selected semantic HTTP headers (`content-type`, `x-tck-response`); transport-generated headers remain in raw evidence. This initial corpus covers JSON-compatible values. Rich values, streaming, WebSockets, concurrency histories, and documented-divergence manifests are later work.
+Assertions preserve ordering where it is part of the contract. The rich-value observation codec distinguishes missing/undefined/null, BigInt, special numbers, byte views, ArrayBuffer, Date, Map, and Set; it rejects unsupported or cyclic observations explicitly. Concurrent increment cases validate every state transition rather than only the final counter. Alarms, Queue delivery, and Workflows use real runtime execution and bounded polling; no reference-only event injection is used.
 
-`pnpm check` runs formatting, both host/fixture type checks, and Effect unit tests. Regenerate fixture types with `pnpm types:fixtures` after changing bindings. CI runs the reference self-check and local container comparison and uploads evidence on failure as well as success.
+The cache and returned-RPC-target cases have documented, version-scoped divergences: celld implements an always-miss cache and rejects transferring RPC stubs across isolates. Each is reported as `divergence` in JSON and skipped with an explanation in JUnit, never as a compatibility pass. An unexpected pass, a changed divergent result, or a different celld version fails and requires review. Undocumented mismatches remain failures.
 
-## Layout and next milestones
+The coverage manifest is checked against the executable catalog before provisioning. Missing or duplicated cases fail validation. Every selected case starts with an infrastructure-error placeholder; an unexecuted case can never disappear or pass. Cases do not retry after failures. Only readiness and observable asynchronous completion use bounded polling. Per-request deadline: 10 seconds; each case side: 30 seconds; complete run: 10 minutes. Responses are limited to 1 MiB and command output to 8 MiB per stream.
 
-- `src/Domain.ts`, `Oracle.ts`, `Cases.ts`: case contracts and independent semantic checks.
-- `src/Transport.ts`, `Processes.ts`, `Artifacts.ts`: Effect services and Layers.
-- `src/Reference.ts`, `ReferenceProcess.ts`, `Local.ts`, `Resources.ts`: scoped runtime adapters and resource ownership.
-- `src/Runner.ts`, `main.ts`, `Report.ts`: execution, Effect CLI, and reporting.
-- `fixtures/core/`: Effect-based Worker/DO fixture and generated binding types.
-- `docs/DESIGN.md`: design and the remaining coverage plan.
+## Resource ownership
 
-Only `local` and `reference` profiles are implemented. Tests have no Docker or AWS branches; new adapters can supply endpoints without changing semantic cases. Real S3, attached AWS fleets, automatic AWS provisioning, multi-node testing, and managed Cloudflare comparisons remain future milestones. No AWS resources are created by this version.
+Each fixture deployment owns a unique Compose project, private network, volumes, and reference state directory. Only the celld public listener is exposed, on an ephemeral loopback port. MinIO credentials are disposable local test credentials. Miniflare runs in scoped child processes because its signal handlers otherwise bypass the driver's cleanup.
+
+Finalizers collect logs and remove owned Docker resources on success, failure, and handled SIGINT/SIGTERM. Cleanup failures make the run fail. SIGKILL or a host crash cannot run finalizers; the report and command log identify owned resources for recovery. Never use a global Docker prune.
+
+## Pinned stack and development
+
+- Effect, `@effect/platform-node`, `@effect/vitest`: **4.0.0-rc.115**.
+- TypeScript **7.0.2**, Node **24.21.0**, pnpm **11.15.0**.
+- Miniflare **4.20260730.0**, workerd **1.20260730.1**, compatibility date **2026-07-30**. Base fixtures have no Node compatibility flag; Node tests are a separate profile.
+- celld **v0.5.0**, MinIO **RELEASE.2025-09-07T16-13-09Z**, and `mc` **RELEASE.2025-08-13T08-35-41Z**, pinned by image digest in [infra/compose.yaml](infra/compose.yaml).
+
+`pnpm check` runs formatting, host/base/Node fixture type checks, and Effect tests for the oracle, codec, coverage, configuration rejection, reports, cleanup, and reference process isolation. Regenerate binding declarations with `pnpm types:fixtures`. CI runs the reference and local suites and uploads evidence even on failure. A known failing upstream compatibility case is not automatically waived in CI.
+
+Add cases in `src/CoreCases.ts`, `ServiceCases.ts`, `NodeCases.ts`, or `ExtensionCases.ts`; add their IDs to `docs/coverage.json`. Assertions belong in the driver. Fixtures perform platform operations and expose observations. Keep unknown-data validation at boundaries, use Effect services and scopes, and adapt Promise APIs only at their platform boundary. See [AGENTS.md](AGENTS.md) and [docs/DESIGN.md](docs/DESIGN.md).
+
+Only `local` and `reference` environment adapters are implemented. The same semantic cases can be reused by future S3/attached-AWS adapters; no AWS execution or provisioning is claimed here.

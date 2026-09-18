@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "scope": "Public API behavior on the pinned local workerd and celld releases. A representative contract corpus, not an exhaustive proof for every input or distributed schedule.",
+  "families": [
+    {
+      "family": "http",
+      "cases": [
+        "http.request-response",
+        "http.body-consumption",
+        "http.headers",
+        "http.url-formdata",
+        "http.encoding",
+        "http.abort",
+        "http.redirect",
+        "http.fetch-abort"
+      ]
+    },
+    {
+      "family": "storage",
+      "cases": [
+        "storage.round-trip",
+        "storage.transaction-rollback",
+        "storage.rich-values",
+        "storage.batch-ranges",
+        "storage.delete-all",
+        "storage.transaction-commit",
+        "storage.explicit-rollback",
+        "storage.invalid-input",
+        "storage.synchronous-kv"
+      ]
+    },
+    {
+      "family": "sql",
+      "cases": [
+        "sql.transaction-rollback",
+        "sql.bindings-cursors",
+        "sql.constraints",
+        "sql.transaction-commit",
+        "sql.mixed-rollback"
+      ]
+    },
+    {
+      "family": "cache",
+      "cases": ["cache.documented-miss"]
+    },
+    {
+      "family": "crypto",
+      "cases": ["crypto.sha256-hmac", "crypto.aes-gcm"]
+    },
+    {
+      "family": "web",
+      "cases": ["web.html-rewriter"]
+    },
+    {
+      "family": "identity",
+      "cases": ["identity.namespace"]
+    },
+    {
+      "family": "concurrency",
+      "cases": ["concurrency.input-gates", "concurrency.explicit-gate"]
+    },
+    {
+      "family": "rpc",
+      "cases": [
+        "rpc.structured-clone",
+        "rpc.thrown-error",
+        "rpc.returned-target",
+        "rpc.named-service"
+      ]
+    },
+    {
+      "family": "alarms",
+      "cases": ["alarms.set-replace-delete", "alarms.fire", "alarms.retry"]
+    },
+    {
+      "family": "streams",
+      "cases": [
+        "streams.tee",
+        "streams.cancel",
+        "streams.error",
+        "streams.transform",
+        "streams.backpressure",
+        "streams.http-binary"
+      ]
+    },
+    {
+      "family": "websocket",
+      "cases": ["websocket.protocol-attachment"]
+    },
+    {
+      "family": "kv",
+      "cases": ["kv.metadata-list", "kv.binary-pagination"]
+    },
+    {
+      "family": "d1",
+      "cases": ["d1.bindings-results", "d1.batch-rollback"]
+    },
+    {
+      "family": "r2",
+      "cases": [
+        "r2.metadata-range-delete",
+        "r2.conditional-write",
+        "r2.multipart"
+      ]
+    },
+    {
+      "family": "queues",
+      "cases": ["queues.batch-ack-retry"]
+    },
+    {
+      "family": "workflows",
+      "cases": [
+        "workflows.steps-sleep-result",
+        "workflows.retry",
+        "workflows.event"
+      ]
+    },
+    {
+      "family": "node",
+      "cases": [
+        "node.buffer",
+        "node.path-events",
+        "node.async-context",
+        "node.hash-compression"
+      ]
+    },
+    {
+      "family": "wasm",
+      "cases": ["wasm.module"]
+    },
+    {
+      "family": "assets",
+      "cases": ["assets.binding"]
+    },
+    {
+      "family": "dynamic",
+      "cases": ["dynamic.fetch"]
+    },
+    {
+      "family": "facets",
+      "cases": ["facets.isolation"]
+    },
+    {
+      "family": "context",
+      "cases": ["context.wait-until"]
+    }
+  ],
+  "excluded": [
+    {
+      "family": "AWS provisioning and distributed recovery",
+      "reason": "Separate infrastructure and reliability qualification; no cloud resources or fault-injection controls are used by this API suite."
+    },
+    {
+      "family": "Containers, Sandbox, and edge-only services",
+      "reason": "Require a separate container runtime or managed Cloudflare environment; not implied by the local celld container."
+    },
+    {
+      "family": "Cron, TCP/TLS, and managed Cloudflare service guarantees",
+      "reason": "Require a clock-controlled or externally reachable reference environment; not established by Miniflare API emulation."
+    },
+    {
+      "family": "WebSocket hibernation, PITR, and multi-node routing",
+      "reason": "Require explicit lifecycle controls; an open-socket test is not a hibernation test."
+    }
+  ]
+}

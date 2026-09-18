@@ -1,0 +1,357 @@
+import { Effect, Schema } from "effect";
+import { encode, richValue } from "../fixtures/shared/Codec.js";
+import { call, define, response, initialCases } from "./Cases.js";
+import { Transport, TckError, type TestCase } from "./Domain.js";
+import { equal } from "./Oracle.js";
+
+export const endpoint = (
+  id: string,
+  path: string,
+  expected: unknown,
+  contract: string,
+): TestCase => ({
+  ...define(
+    id,
+    (target, input) => call(target, input, path),
+    () => response(expected),
+  ),
+  contract,
+});
+const webDoc = "https://developers.cloudflare.com/workers/runtime-apis/";
+const storageDoc =
+  "https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/";
+const ep = (id: string, path: string, expected: unknown) =>
+  endpoint(
+    id,
+    path,
+    expected,
+    id.startsWith("storage.") || id.startsWith("sql.") ? storageDoc : webDoc,
+  );
+const concurrency = (id: string, path: string): TestCase => ({
+  id,
+  contract:
+    "https://developers.cloudflare.com/durable-objects/api/state/#blockconcurrencywhile",
+  run: (target, input) =>
+    Effect.all(
+      Array.from({ length: 12 }, () => call(target, input, path)),
+      { concurrency: "unbounded" },
+    ),
+  check: (value) =>
+    Effect.gen(function* () {
+      const rows = yield* Schema.decodeUnknownEffect(
+        Schema.Array(
+          Schema.Struct({
+            status: Schema.Literal(200),
+            body: Schema.Struct({
+              before: Schema.Int,
+              after: Schema.Int,
+              initialized: Schema.Literal(true),
+            }),
+          }),
+        ),
+      )(value).pipe(
+        Effect.mapError(
+          (e) => new TckError({ phase: "assertion", message: String(e) }),
+        ),
+      );
+      yield* equal(rows.length, 12);
+      // Arrival order is intentionally not asserted; the observed transitions must
+      // form a legal serialized history, including every intermediate value.
+      yield* equal(
+        rows.map((r) => r.body.before).sort((a, b) => a - b),
+        Array.from({ length: 12 }, (_, i) => i),
+      );
+      for (const row of rows) yield* equal(row.body.after, row.body.before + 1);
+    }),
+  compare: () => Effect.void,
+});
+export const poll = <A>(
+  read: Effect.Effect<A, TckError, Transport>,
+  done: (value: A) => boolean,
+): Effect.Effect<A, TckError, Transport> =>
+  Effect.gen(function* () {
+    for (let i = 0; i < 160; i++) {
+      const value = yield* read;
+      if (done(value)) return value;
+      yield* Effect.sleep("100 millis");
+    }
+    return yield* Effect.fail(
+      new TckError({
+        phase: "assertion",
+        message: "Eventual state not reached before deadline",
+      }),
+    );
+  });
+const alarm = (retry: boolean): TestCase => ({
+  ...define(
+    retry ? "alarms.retry" : "alarms.fire",
+    (target, input) =>
+      Effect.gen(function* () {
+        yield* equal(
+          yield* call(target, input, `/alarms/start${retry ? "?retry=1" : ""}`),
+          response({ scheduled: true }),
+        );
+        return yield* poll(
+          call(target, input, "/alarms/state"),
+          (result) =>
+            typeof result.body === "object" &&
+            result.body !== null &&
+            "fires" in result.body &&
+            Number(result.body.fires) >= (retry ? 2 : 1),
+        );
+      }),
+    () => response({ fires: retry ? 2 : 1, retry, retryCount: retry ? 1 : 0 }),
+  ),
+  contract: "https://developers.cloudflare.com/durable-objects/api/alarms/",
+});
+export const coreCases: ReadonlyArray<TestCase> = [
+  ...initialCases,
+  ep("http.fetch-abort", "/web/fetch-abort", { error: "AbortError" }),
+  ep("storage.synchronous-kv", "/storage/synchronous-kv", {
+    a: { value: 1 },
+    list: [
+      ["b", "λ"],
+      ["a", { value: 1 }],
+    ],
+    removed: true,
+    missing: true,
+  }),
+  ep("sql.mixed-rollback", "/sql/mixed-rollback", {
+    error: "Error",
+    balance: 1,
+    rows: [],
+  }),
+  {
+    ...define(
+      "context.wait-until",
+      (target, input) =>
+        Effect.gen(function* () {
+          yield* equal(
+            yield* call(target, input, "/context/background-start"),
+            response({ scheduled: true }),
+          );
+          return yield* poll(
+            call(target, input, "/storage/get?key=background"),
+            (result) =>
+              (result.body as { present?: boolean } | null)?.present === true,
+          );
+        }),
+      () => response({ present: true, value: "complete" }),
+    ),
+    contract:
+      "https://developers.cloudflare.com/durable-objects/api/state/#waituntil",
+  },
+  {
+    ...ep("cache.documented-miss", "/web/cache", {
+      value: "cached",
+      deleted: true,
+    }),
+    divergence: {
+      celldVersion: "0.5.0",
+      source: "https://celld.dev/docs/cloudflare-compat/#cache",
+      reason: "celld deliberately implements an always-miss cache",
+      reviewDate: "2026-09-18",
+      owner: "celld-tck maintainers",
+      check: (value) => equal(value, response({ value: null, deleted: false })),
+    },
+  },
+  ep("http.body-consumption", "/web/body", {
+    before: false,
+    after: true,
+    text: "λ🌍",
+    cloned: "λ🌍",
+    twice: "TypeError",
+    lateClone: "TypeError",
+  }),
+  ep("http.headers", "/web/headers", {
+    joined: "first, second",
+    replaced: "replacement",
+    deleted: true,
+    invalid: "TypeError",
+  }),
+  ep("http.url-formdata", "/web/url-form", {
+    pathname: "/a%20b",
+    query: ["1", "2"],
+    values: ["first", "λ"],
+    file: {
+      name: "bytes.bin",
+      type: "application/octet-stream",
+      bytes: [0, 128, 255],
+    },
+  }),
+  ep("http.encoding", "/web/encoding", {
+    bytes: [206, 187, 240, 159, 140, 141],
+    decoded: "λ🌍",
+    base64: "AP8=",
+    decodedBase64: [0, 255],
+    invalid: "TypeError",
+  }),
+  ep("http.abort", "/web/abort", {
+    aborted: true,
+    calls: 1,
+    reason: "test abort",
+    thrown: "Error",
+  }),
+  ep("http.redirect", "/web/redirect", {
+    status: 307,
+    location: "https://example.test/next",
+    invalid: "RangeError",
+  }),
+  ep("crypto.sha256-hmac", "/web/crypto", {
+    digest: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    hmac: "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+    verified: true,
+    rejected: false,
+    uuid: true,
+  }),
+  ep("crypto.aes-gcm", "/web/aes", {
+    ciphertext: "58e2fccefa7e3061367f1d57a4e7455a",
+    plaintext: [],
+    tampered: "OperationError",
+  }),
+  ep("web.html-rewriter", "/web/html", {
+    html: '<p data-test="yes">λ &amp; text</p>',
+  }),
+  ep("storage.rich-values", "/storage/rich", encode(richValue())),
+  ep("storage.batch-ranges", "/storage/batch", {
+    got: [
+      ["k:a", 1],
+      ["k:c", 3],
+    ],
+    forward: [["k:b", 2]],
+    reverse: [
+      ["k:c", 3],
+      ["k:b", 2],
+    ],
+    after: [["k:b", 2]],
+    deleted: 2,
+    remaining: [
+      ["k:b", 2],
+      ["other", 9],
+    ],
+  }),
+  ep("storage.delete-all", "/storage/delete-all", { values: [], alarm: null }),
+  ep("storage.transaction-commit", "/storage/commit", {
+    result: 7,
+    entries: [
+      ["a", 7],
+      ["b", 8],
+    ],
+  }),
+  ep("storage.explicit-rollback", "/storage/explicit-rollback", { value: 1 }),
+  ep("storage.invalid-input", "/storage/invalid", {
+    limit: "TypeError",
+    unserializable: "DataCloneError",
+  }),
+  ep("sql.bindings-cursors", "/sql/types", {
+    columns: ["id", "text", "n", "empty", "nil", "bytes"],
+    inserted: [
+      {
+        id: 1,
+        text: "λ'",
+        n: 1.25,
+        empty: "",
+        nil: null,
+        bytes: { type: "ArrayBuffer", value: [0, 128, 255] },
+      },
+    ],
+    raw: [[1, "λ'", null]],
+    count: { n: 1 },
+  }),
+  ep("sql.constraints", "/sql/constraints", {
+    duplicate: true,
+    nil: true,
+    multiple: true,
+    empty: true,
+    rows: [{ id: 1, v: "a" }],
+  }),
+  ep("sql.transaction-commit", "/sql/commit", { returned: 42, row: { n: 3 } }),
+  ep("identity.namespace", "/identity/namespace", {
+    same: true,
+    different: true,
+    roundTrip: true,
+    unique: true,
+    invalid: "TypeError",
+  }),
+  concurrency("concurrency.input-gates", "/concurrency/increment"),
+  concurrency("concurrency.explicit-gate", "/concurrency/block"),
+  ep("rpc.structured-clone", "/rpc/echo", encode(richValue())),
+  ep("rpc.thrown-error", "/rpc/error", { error: "TypeError" }),
+  {
+    ...ep("rpc.returned-target", "/rpc/target", { sum: 42 }),
+    divergence: {
+      celldVersion: "0.5.0",
+      source: "https://celld.dev/docs/cloudflare-compat/#rpc",
+      reason: "celld cannot transfer an RPC stub across an isolate boundary",
+      reviewDate: "2026-09-18",
+      owner: "celld-tck maintainers",
+      check: (value) =>
+        equal(
+          value,
+          response({
+            error: {
+              name: "Error",
+              message: "RPC stubs cannot cross isolate boundaries yet.",
+            },
+          }),
+        ),
+    },
+  },
+  ep("alarms.set-replace-delete", "/alarms/manage", {
+    set: true,
+    replaced: true,
+    deleted: null,
+  }),
+  alarm(false),
+  alarm(true),
+  ep("streams.tee", "/streams/tee", {
+    a: [0, 128, 255, 10],
+    b: [0, 128, 255, 10],
+  }),
+  ep("streams.cancel", "/streams/cancel", {
+    first: { value: "first", done: false },
+    reason: "stop",
+    pulls: 1,
+    after: { done: true },
+  }),
+  ep("streams.error", "/streams/error", { error: "TypeError" }),
+  ep("streams.transform", "/streams/transform", { text: "AΛ" }),
+  ep("streams.backpressure", "/streams/backpressure", {
+    initial: 1,
+    blocked: 0,
+    resumed: 1,
+    trace: ["one"],
+  }),
+  {
+    ...define(
+      "streams.http-binary",
+      (target, input) => call(target, input, "/streams/response"),
+      () =>
+        response([0, 1, 128, 255, 10], 200, {
+          "content-type": "application/octet-stream",
+        }),
+    ),
+    contract: webDoc + "streams/",
+  },
+  {
+    ...define(
+      "websocket.protocol-attachment",
+      (target, input) =>
+        Effect.gen(function* () {
+          return yield* (yield* Transport).websocket(
+            target,
+            `/websocket?name=${input.namespace}`,
+          );
+        }),
+      () => [
+        { type: "open" },
+        { type: "message", value: "hello λ" },
+        { type: "message", value: [0, 128, 255] },
+        { type: "message", value: '{"label":"durable","count":7}' },
+        { type: "close", code: 1000, reason: "done", clean: true },
+      ],
+    ),
+    contract:
+      "https://developers.cloudflare.com/durable-objects/api/websockets/",
+  },
+];

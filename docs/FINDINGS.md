@@ -1,0 +1,43 @@
+# Local compatibility findings
+
+The suite compares pinned celld v0.5.0 with Miniflare 4.20260730.0 / workerd 1.20260730.1 at compatibility date 2026-07-30. All authored TypeScript uses Effect 4.0.0-rc.115. These are local observations, not AWS or managed Cloudflare qualification.
+
+## Validation
+
+- `pnpm check`: formatting, three TypeScript projects, and 26 harness tests passed.
+- Reference self-check: **63/63 passed** (`tck-2be81d98-acd3-4f22-92e6-eb0a63c09b3d`).
+- Full local run: **65 passed, 2 documented divergences, 2 failures** across 63 differential cases and 6 deployment checks (`tck-7c8c6cf9-b2f3-4d2d-b2c0-8c21b7fbca7d`). All cases reached terminal results; no case-level infrastructure/reference errors.
+- Exit status is 1 for the local run because the two unexpected differences remain failures. CI has been configured but was not run remotely.
+
+Evidence is under `artifacts/<run-id>/report.json` and accompanying files; artifacts are intentionally ignored by Git. The full local run includes the Workflow retry/event and extension cases, unlike earlier incremental runs.
+
+## Unexpected differences
+
+| Case                    | workerd expectation                                                                             | celld observation                                                             |
+| ----------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `http.body-consumption` | Reading an already-consumed Request body rejects with `TypeError`.                              | A second `.text()` call is accepted. Cloning after consumption still rejects. |
+| `storage.invalid-input` | Negative list limit rejects with `TypeError`; storing a function rejects with `DataCloneError`. | Both operations reject, but with `Error` and `TypeError`, respectively.       |
+
+Both remain strict failures. The suite exits nonzero and preserves the candidate result, reference result, assertion diff, and raw traffic. No baselines were changed to make these pass. The error-type difference is a compatibility observation, not a claim of data loss.
+
+## Documented divergences
+
+- `cache.documented-miss`: celld deliberately implements an always-miss cache. The candidate must return no match and `false` for deletion after `put`; workerd must retrieve the stored response. [celld cache contract](https://celld.dev/docs/cloudflare-compat/#cache).
+- `rpc.returned-target`: workerd can return a live `RpcTarget` and invoke it; celld rejects the stub crossing an isolate boundary. The fixture captures the rejection as an observation. [celld RPC contract](https://celld.dev/docs/cloudflare-compat/#rpc).
+
+These expectations are restricted to celld 0.5.0, have exact candidate checks and review metadata, and are reported separately. An unexpected conformance pass or changed candidate result fails pending review. They do not apply to the reference-versus-reference self-check.
+
+## Infrastructure evidence
+
+Two runs encountered a connection reset during celld's conditional-write storage diagnostic, before API cases started:
+
+- `tck-9b34c9d9-de59-4eaf-9fab-41dc76326aae` (extensions setup).
+- `tck-fa6996a9-1724-4166-80ea-e848ecb2bebe` (core setup).
+
+The diagnostic failed while updating its probe object, reported that the write may have committed, and returned exit 1. The harness did not bypass or automatically retry it. The raw diagnosis is retained in each run's `commands.jsonl`; cleanup ran and unexecuted cases remained infrastructure errors. Other runs completed storage diagnostics and all selected API cases. This transient local storage/transport issue remains unresolved and is not relabeled as API incompatibility.
+
+## Scope
+
+See [coverage.json](coverage.json) for exact coverage and exclusions. The corpus exercises real network HTTP/WebSocket calls, actual alarms, Queue delivery/retry, Workflow execution/retry/events, and uploaded fixture modules. Miniflare's KV/D1/R2/Queues/Workflows implementations remain local service emulators. Passing these cases does not establish edge caching, production service latency, host-failure durability, hibernation, or multi-node correctness.
+
+No upstream fixes, commits, pushes, or cloud deployments are part of this change.
