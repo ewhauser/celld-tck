@@ -1,4 +1,5 @@
 import { Effect, Schema } from "effect";
+import { pollUntil } from "./Polling.js";
 import { encode, richValue } from "../fixtures/shared/Codec.js";
 import { call, define, response, initialCases } from "./Cases.js";
 import { Transport, TckError, type TestCase } from "./Domain.js";
@@ -69,19 +70,18 @@ export const poll = <A>(
   read: Effect.Effect<A, TckError, Transport>,
   done: (value: A) => boolean,
 ): Effect.Effect<A, TckError, Transport> =>
-  Effect.gen(function* () {
-    for (let i = 0; i < 160; i++) {
-      const value = yield* read;
-      if (done(value)) return value;
-      yield* Effect.sleep("100 millis");
-    }
-    return yield* Effect.fail(
-      new TckError({
-        phase: "assertion",
-        message: "Eventual state not reached before deadline",
-      }),
-    );
-  });
+  pollUntil(read, done, {
+    interval: "100 millis",
+    attempts: 160,
+    timeout: "30 seconds",
+    message: "Eventual state not reached before deadline",
+  }).pipe(
+    Effect.mapError((error) =>
+      error instanceof TckError
+        ? error
+        : new TckError({ phase: "assertion", message: String(error) }),
+    ),
+  );
 const alarm = (retry: boolean): TestCase => ({
   ...define(
     retry ? "alarms.retry" : "alarms.fire",
