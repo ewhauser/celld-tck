@@ -1,6 +1,7 @@
 import { Effect, FileSystem } from "effect";
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { Artifacts } from "./Artifacts.js";
 import { decodeJsonc } from "./Jsonc.js";
@@ -9,6 +10,9 @@ import { TckError, type Bundle } from "./Domain.js";
 import { FixtureConfig } from "./FixtureConfig.js";
 export const sha256 = (value: string | Uint8Array) =>
   createHash("sha256").update(value).digest("hex");
+const effectVersion: string = createRequire(import.meta.url)(
+  "effect/package.json",
+).version;
 
 export const buildFixtureFor = (
   fixture:
@@ -120,7 +124,7 @@ export const buildFixtureFor = (
     yield* artifacts.json("fixture/manifest.json", {
       ...bundle,
       source: "worker.js",
-      effect: "4.0.0-rc.115",
+      effect: effectVersion,
     });
     return bundle;
   });
