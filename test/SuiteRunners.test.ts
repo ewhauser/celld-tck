@@ -14,9 +14,11 @@ import { artifactsLayer } from "../src/Artifacts.js";
 import { Report, Transport } from "../src/Domain.js";
 import { Processes } from "../src/Processes.js";
 import { runSuite } from "../src/Runner.js";
-import { runRecovery } from "../src/Recovery.js";
-import { runMultinode } from "../src/Multinode.js";
-import { runQualification } from "../src/Qualification.js";
+import { qualificationIds, runQualification } from "../src/Qualification.js";
+import { suites } from "../src/Catalog.js";
+import { deploymentIds } from "../src/DeploymentChecks.js";
+import { recoveryIds, runRecovery } from "../src/Recovery.js";
+import { multinodeIds, runMultinode } from "../src/Multinode.js";
 
 class SetupProbe extends Context.Service<
   SetupProbe,
@@ -40,14 +42,24 @@ const options = {
   seed: 42,
   caseId: "",
 };
+// Every selected case must still be reported, so the expected counts come from
+// the same registries the runners select from.
 const runners = [
-  { name: "api", work: runSuite(options), count: 69 },
-  { name: "recovery", work: runRecovery(options), count: 5 },
-  { name: "multinode", work: runMultinode(options), count: 4 },
+  {
+    name: "api",
+    work: runSuite(options),
+    count: suites.all.length + deploymentIds.length,
+  },
+  { name: "recovery", work: runRecovery(options), count: recoveryIds.length },
+  {
+    name: "multinode",
+    work: runMultinode(options),
+    count: multinodeIds("bucket").length,
+  },
   {
     name: "qualification",
     work: runQualification({ ...options, suite: "traffic" }),
-    count: 3,
+    count: qualificationIds.filter((id) => id.startsWith("traffic.")).length,
   },
 ];
 for (const runner of runners)
