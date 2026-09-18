@@ -26,7 +26,8 @@
     "test:traffic": "tsx src/main.ts --profile local --suite traffic",
     "test:dependencies": "tsx src/main.ts --profile local --suite dependencies",
     "test:faults": "tsx src/main.ts --profile local --suite faults",
-    "test:capacity": "tsx src/main.ts --profile local --suite capacity"
+    "test:capacity": "tsx src/main.ts --profile local --suite capacity",
+    "site:build": "tsx src/site/main.ts"
   },
   "dependencies": {
     "jsonc-parser": "3.3.1",

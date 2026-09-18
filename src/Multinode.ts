@@ -50,6 +50,28 @@ const bucketIds = [
   "multinode.owner-rejoin",
   "multinode.storage-partition",
 ];
+export const multinodeIds = (
+  durability: "bucket" | "fleet",
+  resilience = false,
+) => {
+  let ids =
+    durability === "fleet"
+      ? [
+          ...bucketIds.map((id) => id.replace("multinode.", "fleet.")),
+          "fleet.follower-recovery",
+        ]
+      : bucketIds;
+  if (resilience)
+    ids = [
+      ...ids.map((id) => id.replace("fleet.", "resilience.")),
+      "resilience.paused-owner",
+      "resilience.interrupted-writes",
+      "resilience.simultaneous-restart",
+      "resilience.follower-loss",
+      "resilience.replica-disk-loss",
+    ];
+  return ids;
+};
 export const runMultinode = (options: {
   runId: string;
   profile: string;
@@ -74,22 +96,7 @@ export const runMultinode = (options: {
       : durability === "fleet"
         ? "fleet"
         : "multinode";
-    let ids =
-      durability === "fleet"
-        ? [
-            ...bucketIds.map((id) => id.replace("multinode.", "fleet.")),
-            "fleet.follower-recovery",
-          ]
-        : bucketIds;
-    if (options.resilience)
-      ids = [
-        ...ids.map((id) => id.replace("fleet.", "resilience.")),
-        "resilience.paused-owner",
-        "resilience.interrupted-writes",
-        "resilience.simultaneous-restart",
-        "resilience.follower-loss",
-        "resilience.replica-disk-loss",
-      ];
+    const ids = multinodeIds(durability, options.resilience ?? false);
     const artifacts = yield* Artifacts;
     const transport = yield* Transport;
     const environment: Record<string, unknown> = {
