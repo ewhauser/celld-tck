@@ -1,4 +1,4 @@
-import { Effect, Exit, FileSystem, Schema } from "effect";
+import { Effect, Exit, FileSystem, Schema, Schedule } from "effect";
 import { resolve } from "node:path";
 import { DiskContainer, DiskVolume, ownedStateVolume } from "./DiskLoss.js";
 import { equal } from "./Oracle.js";
@@ -225,6 +225,97 @@ export const acquireLocal = (
           });
         return {
           lifecycle: {
+            stopStorage: () =>
+              Effect.gen(function* () {
+                const before = (yield* recordState("before-outage"))[0]?.State;
+                if (!before?.Running)
+                  return yield* Effect.fail(
+                    new TckError({
+                      phase: "lifecycle",
+                      message: "celld must be running before the outage",
+                    }),
+                  );
+                yield* compose(["stop", "--timeout", "5", "minio"]);
+                const id = (yield* compose([
+                  "ps",
+                  "--all",
+                  "-q",
+                  "minio",
+                ])).stdout.trim();
+                const raw = (yield* processes.run("docker", ["inspect", id]))
+                  .stdout;
+                yield* artifacts.text("outage-minio-stopped.json", raw);
+                const state = (yield* decodeJson(
+                  Schema.Array(DiskContainer),
+                  raw,
+                ))[0];
+                if (!state || state.State.Running)
+                  return yield* Effect.fail(
+                    new TckError({
+                      phase: "lifecycle",
+                      message: "MinIO did not stop",
+                    }),
+                  );
+              }),
+            restoreStorage: () =>
+              Effect.gen(function* () {
+                yield* compose(["start", "minio"]);
+                yield* compose([
+                  "run",
+                  "--no-deps",
+                  "--rm",
+                  "-T",
+                  "--entrypoint",
+                  "mc",
+                  "storage",
+                  "stat",
+                  "local/tck",
+                ]).pipe(
+                  Effect.retry({
+                    schedule: Schedule.spaced("500 millis"),
+                    times: 10,
+                  }),
+                  Effect.timeout("30 seconds"),
+                  Effect.mapError((error) =>
+                    error instanceof TckError
+                      ? error
+                      : new TckError({
+                          phase: "lifecycle",
+                          message: String(error),
+                        }),
+                  ),
+                );
+              }),
+            prepareRestart: () =>
+              Effect.gen(function* () {
+                const state = (yield* recordState("after-outage"))[0]?.State;
+                if (!state)
+                  return yield* Effect.fail(
+                    new TckError({
+                      phase: "lifecycle",
+                      message: "Missing celld state after outage",
+                    }),
+                  );
+                if (state.Running) {
+                  yield* compose(["kill", "--signal", "SIGKILL", "celld"]);
+                  const stopped = (yield* recordState(
+                    "outage-restart-stopped",
+                  ))[0]?.State;
+                  if (!stopped || stopped.Running || stopped.ExitCode !== 137)
+                    return yield* Effect.fail(
+                      new TckError({
+                        phase: "lifecycle",
+                        message: "Could not stop celld for recovery",
+                      }),
+                    );
+                } else if (state.ExitCode !== 3)
+                  return yield* Effect.fail(
+                    new TckError({
+                      phase: "lifecycle",
+                      message: `Unexpected celld exit after outage: ${state.ExitCode}`,
+                    }),
+                  );
+              }),
             discardDisk: () =>
               Effect.gen(function* () {
                 const inspectService = (service: string) =>

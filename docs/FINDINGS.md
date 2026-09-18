@@ -4,7 +4,7 @@ The suite compares pinned celld v0.5.0 with Miniflare 4.20260730.0 / workerd 1.2
 
 ## Current known-bug policy validation
 
-- `pnpm check`: formatting, three TypeScript projects, and 32 harness tests passed.
+- `pnpm check`: formatting, three TypeScript projects, and 34 harness tests passed.
 - Full local run: **65 passed, 2 divergences, 2 known bugs**, exit 0 (`tck-b3d376f9-1c06-49c1-8919-9f0cdf333d7b`).
 - Reference reproductions: **2 passed**, exit 0 (`tck-e1f63e03-89b2-4b67-a101-206498064bb0`).
 - Local reproductions: **2 known bugs**, exit 0 (`tck-7c0e3f3e-47bd-46ed-9a5f-a759e0d255e1`).
@@ -53,6 +53,10 @@ The diagnostic failed while updating its probe object, reported that the write m
 ## Local process recovery
 
 The separate [recovery suite](RECOVERY.md) passed graceful restart, SIGKILL recovery of acknowledged state, and an alarm due while the process was stopped (`tck-aa23e90c-8fe3-4491-92bd-6dc419459de6`). Those three scenarios retained both local disks. The additional `recovery.disk-loss` scenario passed independently (`tck-54de7fea-fa4c-4ad4-9aa7-fc7b52810358`): the owned celld volume was removed, the replacement was verified empty, MinIO remained unchanged, and data plus the overdue alarm recovered. The full four-case recovery suite also passed (`tck-272a3944-9e22-4284-a132-6d33ee9c32ea`). No multi-node recovery claim is made.
+
+## Object-store outage
+
+The focused `recovery.storage-outage` case passed (`tck-e9c47cb1-60d3-4603-931b-a03ad803806a`). All three outage writes returned transport errors; logs recorded `node_lease_watchdog_fence`. The baseline transaction survived, none of the uncertain writes appeared in either store, and the post-recovery write survived a further SIGKILL/restart. The oracle also accepts fully committed uncertain writes, but never partial KV/SQL transactions. Both disks were retained. The full five-scenario suite also passed (`tck-7d20e9d9-54c2-4fdd-b884-8e074fed0830`), including the final check that previously observed state remains unchanged after a further crash.
 
 ## Scope
 

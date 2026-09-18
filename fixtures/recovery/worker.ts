@@ -19,6 +19,30 @@ export class Recovery extends DurableObject<RecoveryEnv> {
       Effect.gen(function* () {
         const path = new URL(request.url).pathname;
         if (path === "/ready") return Response.json({ ready: true });
+        if (path === "/outage/write") {
+          const id = Number(new URL(request.url).searchParams.get("id"));
+          if (!Number.isInteger(id) || id < 1 || id > 5)
+            return new Response("invalid id", { status: 400 });
+          yield* Effect.sync(() =>
+            storage.transactionSync(() => {
+              storage.sql
+                .exec(
+                  "CREATE TABLE IF NOT EXISTS outage (id INTEGER PRIMARY KEY, value TEXT)",
+                )
+                .toArray();
+              storage.sql
+                .exec("INSERT INTO outage VALUES (?, ?)", id, `value-${id}`)
+                .toArray();
+              storage.kv.put(`op:${id}`, `value-${id}`);
+            }),
+          );
+          return Response.json({ acknowledged: id });
+        }
+        if (path === "/outage/state")
+          return Response.json({
+            kv: [...storage.kv.list({ prefix: "op:" })],
+            sql: storage.sql.exec("SELECT * FROM outage ORDER BY id").toArray(),
+          });
         if (path === "/seed") {
           yield* platform(() =>
             storage.put({

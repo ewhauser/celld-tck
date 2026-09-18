@@ -10,6 +10,7 @@ import {
 } from "./Domain.js";
 import { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
+import { runOutage } from "./Outage.js";
 import { junit } from "./Report.js";
 
 export const recoveryIds = [
@@ -17,6 +18,7 @@ export const recoveryIds = [
   "recovery.crash",
   "recovery.overdue-alarm",
   "recovery.disk-loss",
+  "recovery.storage-outage",
 ] as const;
 const Snapshot = Schema.Struct({
   activation: Schema.String,
@@ -134,6 +136,11 @@ export const runRecovery = (options: {
             const name = `${options.runId}-${id.replaceAll(".", "-")}`;
             const attempt = yield* Effect.exit(
               Effect.gen(function* () {
+                if (id === "recovery.storage-outage") {
+                  const recovered = yield* runOutage(target, name, lifecycle);
+                  target = recovered.target;
+                  return recovered.observations;
+                }
                 const seeded = yield* request("/seed", name, "POST").pipe(
                   Effect.flatMap(
                     Schema.decodeUnknownEffect(
@@ -207,7 +214,13 @@ export const runRecovery = (options: {
                 });
                 yield* checkRecovered(seeded.activation, recovered, alarm);
                 return recovered;
-              }).pipe(Effect.timeout("120 seconds")),
+              }).pipe(
+                Effect.timeout(
+                  id === "recovery.storage-outage"
+                    ? "180 seconds"
+                    : "120 seconds",
+                ),
+              ),
             );
             if (Exit.isFailure(attempt) && Cause.hasInterrupts(attempt.cause))
               return yield* Effect.failCause(attempt.cause);
