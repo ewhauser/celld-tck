@@ -4,6 +4,64 @@ import { operation, platform, rejection } from "./Platform.js";
 export const storageOperation = (storage: DurableObjectStorage, path: string) =>
   Effect.gen(function* () {
     switch (path) {
+      case "/storage/sync-committed": {
+        yield* platform(() => storage.put("removed", "old"));
+        yield* platform(() => storage.sync());
+        yield* platform(() =>
+          storage.put("retained", "durable λ", { allowUnconfirmed: true }),
+        );
+        yield* platform(() =>
+          storage.delete("removed", { allowUnconfirmed: true }),
+        );
+        yield* operation(() => {
+          storage.sql.exec(
+            "CREATE TABLE synced (id INTEGER PRIMARY KEY, value TEXT)",
+          );
+          storage.sql
+            .exec("INSERT INTO synced VALUES (1, 'committed')")
+            .toArray();
+        });
+        yield* platform(() => storage.sync());
+        // A second barrier with no intervening writes must also resolve.
+        yield* platform(() => storage.sync());
+        return {
+          retained: yield* platform(() => storage.get("retained")),
+          removed: (yield* platform(() => storage.get("removed"))) ?? null,
+          rows: storage.sql.exec("SELECT * FROM synced ORDER BY id").toArray(),
+        };
+      }
+      case "/sql/consumed-write-cursor": {
+        return yield* Effect.gen(function* () {
+          const returned = yield* operation(() => {
+            storage.sql.exec("CREATE TABLE cursor_values (n INTEGER)");
+            return storage.sql
+              .exec(
+                "INSERT INTO cursor_values VALUES (1), (2), (3) RETURNING n",
+              )
+              .toArray();
+          });
+          yield* platform(() => storage.sync());
+          return {
+            returned,
+            rows: storage.sql
+              .exec("SELECT n FROM cursor_values ORDER BY n")
+              .toArray(),
+          };
+        });
+      }
+      case "/sql/open-read-cursor": {
+        const cursor = yield* operation(() => {
+          storage.sql.exec("CREATE TABLE read_values (n INTEGER)");
+          storage.sql
+            .exec("INSERT INTO read_values VALUES (1), (2), (3)")
+            .toArray();
+          return storage.sql.exec("SELECT n FROM read_values ORDER BY n");
+        });
+        const first = cursor.next().value;
+        yield* platform(() => storage.sync());
+        return { first, remaining: cursor.toArray() };
+      }
+
       case "/storage/synchronous-kv": {
         return yield* operation(() => {
           const kv = storage.kv;

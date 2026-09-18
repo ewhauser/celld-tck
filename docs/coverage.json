@@ -26,7 +26,8 @@
         "storage.transaction-commit",
         "storage.explicit-rollback",
         "storage.invalid-input",
-        "storage.synchronous-kv"
+        "storage.synchronous-kv",
+        "storage.sync-committed"
       ]
     },
     {
@@ -36,7 +37,9 @@
         "sql.bindings-cursors",
         "sql.constraints",
         "sql.transaction-commit",
-        "sql.mixed-rollback"
+        "sql.mixed-rollback",
+        "sql.consumed-write-cursor",
+        "sql.open-read-cursor"
       ]
     },
     {

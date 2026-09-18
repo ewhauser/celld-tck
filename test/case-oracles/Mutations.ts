@@ -21,6 +21,23 @@ const mutate = (name: string, ...changes: [Change, ...Change[]]): Mutation => ({
 const body = (name: string, field: string, value: unknown) =>
   mutate(name, change(["body", field], value));
 export const mutations = {
+  "storage.sync-committed": [
+    body("sync loses an unconfirmed KV write", "retained", null),
+    body("sync loses an unconfirmed deletion", "removed", "old"),
+    body("sync loses committed SQL rows", "rows", []),
+  ],
+  "sql.consumed-write-cursor": [
+    body("consuming RETURNING loses a write", "rows", [{ n: 1 }, { n: 2 }]),
+    body("RETURNING skips an inserted row", "returned", [{ n: 1 }, { n: 3 }]),
+  ],
+  "sql.open-read-cursor": [
+    body("sync invalidates an open read cursor", "remaining", []),
+    body("read cursor repeats its first row", "remaining", [
+      { n: 1 },
+      { n: 2 },
+      { n: 3 },
+    ]),
+  ],
   "http.request-response": [
     body("POST is incorrectly forwarded as GET", "method", "GET"),
     body("duplicate query parameters are collapsed", "query", ["second"]),

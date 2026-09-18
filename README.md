@@ -66,7 +66,7 @@ These tests cover the pinned local runtimes. They do not establish managed Cloud
 
 ## Running individual suites
 
-The default API suite runs 63 compatibility cases and, for local runs, 6 deployment checks. Select `core`, `bindings`, `node`, or `extensions`, or run a single case:
+The default API suite runs 66 compatibility cases and, for local runs, 6 deployment checks. Select `core`, `bindings`, `node`, or `extensions`, or run a single case:
 
 ```sh
 pnpm tck --profile local --suite bindings
@@ -103,6 +103,7 @@ Every new case needs a meaningful negative example that its actual checker rejec
 - [Test design](docs/DESIGN.md)
 - [Recovery](docs/RECOVERY.md), [multi-node failover](docs/MULTINODE.md), and [fleet durability](docs/FLEET.md)
 - [Resilience](docs/RESILIENCE.md) and [qualification scenarios](docs/QUALIFICATION.md)
+- [Storage durability barriers, cursors, and deadlines](docs/STORAGE-DURABILITY.md)
 - [Dashboard publishing and local previews](docs/DASHBOARD.md)
 - [Remaining work](docs/BACKLOG.md)
 

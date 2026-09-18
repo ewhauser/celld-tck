@@ -45,6 +45,14 @@ it.live(
         yield* request(control + "/mode?mode=throttle&ms=1000");
         expect((yield* request(data, "PUT")).status).toBe(503);
         expect(writes).toBe(1);
+        yield* request(
+          control + "/mode?mode=throttle&ms=1000&pathContains=object",
+        );
+        expect((yield* request(data, "PUT")).status).toBe(503);
+        expect(
+          (yield* request(data.replace("/object", "/nodes/lease"))).status,
+        ).toBe(200);
+        expect(writes).toBe(1);
         yield* request(control + "/mode?mode=latency&ms=1000");
         const began = Date.now();
         expect((yield* request(data)).status).toBe(200);

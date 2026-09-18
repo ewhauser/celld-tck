@@ -1,3 +1,4 @@
+import { storageDurabilityCases } from "./StorageDurability.js";
 import { Effect, Fiber, FileSystem, Schema } from "effect";
 import { equal } from "./Oracle.js";
 import {
@@ -137,6 +138,7 @@ const peerPartition = (ctx: QualificationContext) =>
     return result;
   });
 export const faultCases = [
+  ...storageDurabilityCases,
   ...(
     [
       "faults.storage-latency",
