@@ -44,33 +44,32 @@ export const checkHandoff = (
         }),
       );
   });
-const bucketIds = [
-  "multinode.routing",
-  "multinode.owner-failover",
-  "multinode.owner-rejoin",
-  "multinode.storage-partition",
-];
+export const multinodeSuite = (
+  durability: "bucket" | "fleet",
+  resilience = false,
+) =>
+  resilience ? "resilience" : durability === "fleet" ? "fleet" : "multinode";
 export const multinodeIds = (
   durability: "bucket" | "fleet",
   resilience = false,
 ) => {
-  let ids =
-    durability === "fleet"
+  const prefix = `${multinodeSuite(durability, resilience)}.`;
+  return [
+    "routing",
+    "owner-failover",
+    "owner-rejoin",
+    "storage-partition",
+    ...(durability === "fleet" ? ["follower-recovery"] : []),
+    ...(resilience
       ? [
-          ...bucketIds.map((id) => id.replace("multinode.", "fleet.")),
-          "fleet.follower-recovery",
+          "paused-owner",
+          "interrupted-writes",
+          "simultaneous-restart",
+          "follower-loss",
+          "replica-disk-loss",
         ]
-      : bucketIds;
-  if (resilience)
-    ids = [
-      ...ids.map((id) => id.replace("fleet.", "resilience.")),
-      "resilience.paused-owner",
-      "resilience.interrupted-writes",
-      "resilience.simultaneous-restart",
-      "resilience.follower-loss",
-      "resilience.replica-disk-loss",
-    ];
-  return ids;
+      : []),
+  ].map((suffix) => `${prefix}${suffix}`);
 };
 export const runMultinode = (options: {
   runId: string;
@@ -91,11 +90,7 @@ export const runMultinode = (options: {
       );
     const durability = options.durability ?? "bucket";
     const nodeCount = options.resilience ? 3 : 2;
-    const suite = options.resilience
-      ? "resilience"
-      : durability === "fleet"
-        ? "fleet"
-        : "multinode";
+    const suite = multinodeSuite(durability, options.resilience ?? false);
     const ids = multinodeIds(durability, options.resilience ?? false);
     const artifacts = yield* Artifacts;
     const transport = yield* Transport;
@@ -186,8 +181,8 @@ export const runMultinode = (options: {
           yield* equal(result.body, { acknowledged: id });
           acknowledged.push(id);
         });
-      const stage = (index: number, work: Effect.Effect<void, unknown>) =>
-        executor.runCase(ids[index]!, () => work, {
+      const stage = (suffix: string, work: Effect.Effect<void, unknown>) =>
+        executor.runCase(`${suite}.${suffix}`, () => work, {
           timeout: "150 seconds",
           onFailure: "stop",
         });
@@ -199,7 +194,7 @@ export const runMultinode = (options: {
       let survivor: Node = "celld2";
       let original: typeof Owner.Type = { node: owner, epoch: 0 };
       yield* stage(
-        0,
+        "routing",
         Effect.gen(function* () {
           yield* Effect.all([write("celld", 1), write("celld2", 2)], {
             concurrency: 2,
@@ -217,7 +212,7 @@ export const runMultinode = (options: {
         }),
       );
       yield* stage(
-        1,
+        "owner-failover",
         Effect.gen(function* () {
           yield* fleet.kill(owner);
           yield* Effect.sleep("11 seconds");
@@ -229,7 +224,7 @@ export const runMultinode = (options: {
         }),
       );
       yield* stage(
-        2,
+        "owner-rejoin",
         Effect.gen(function* () {
           targets[owner] = yield* fleet.start(owner);
           yield* ready(owner);
@@ -240,7 +235,7 @@ export const runMultinode = (options: {
         }),
       );
       yield* stage(
-        3,
+        "storage-partition",
         Effect.gen(function* () {
           const prior = yield* fleet.owner(cell);
           const isolated = prior.node;
@@ -274,7 +269,7 @@ export const runMultinode = (options: {
       );
       if (durability === "fleet")
         yield* stage(
-          4,
+          "follower-recovery",
           Effect.gen(function* () {
             const prior = yield* fleet.owner(cell);
             const leader = prior.node;
@@ -367,8 +362,11 @@ export const runMultinode = (options: {
               }),
             ),
         });
-        for (const [index, step] of advanced.entries())
-          yield* stage(index + 5, step.run);
+        for (const step of advanced)
+          yield* executor.runCase(step.id, () => step.run, {
+            timeout: "150 seconds",
+            onFailure: "stop",
+          });
       }
     });
     yield* executor.execute(work);
