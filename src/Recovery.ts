@@ -3,7 +3,13 @@ import { Effect, Schema } from "effect";
 import { provenance } from "./Provenance.js";
 import { Artifacts } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
-import { leaseLapse, Transport, TckError, type Target } from "./Domain.js";
+import {
+  leaseLapse,
+  Transport,
+  TckError,
+  type Profile,
+  type Target,
+} from "./Domain.js";
 import { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
 import { runOutage } from "./Outage.js";
@@ -51,7 +57,7 @@ export const checkRecovered = (
   });
 export const runRecovery = (options: {
   runId: string;
-  profile: string;
+  profile: Profile;
   caseId: string;
   seed: number;
 }) =>

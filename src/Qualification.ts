@@ -1,7 +1,8 @@
 import { Effect, type FileSystem } from "effect";
 import { Artifacts, artifactsLayer } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
-import { Transport, TckError } from "./Domain.js";
+import { Transport, TckError, type Profile } from "./Domain.js";
+import type { QualificationSuite } from "./Suites.js";
 import { acquireLocal } from "./Local.js";
 import { provenance } from "./Provenance.js";
 import { makeSuiteExecutor } from "./SuiteExecutor.js";
@@ -36,8 +37,8 @@ export const qualificationCases = [
 export const qualificationIds = qualificationCases.map((test) => test.id);
 export const runQualification = (options: {
   runId: string;
-  profile: string;
-  suite: string;
+  profile: Profile;
+  suite: QualificationSuite;
   caseId: string;
   seed: number;
 }) =>

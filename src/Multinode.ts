@@ -3,7 +3,13 @@ import { Effect, Schema } from "effect";
 import { provenance } from "./Provenance.js";
 import { Artifacts } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
-import { attemptRequest, leaseLapse, Transport, TckError } from "./Domain.js";
+import {
+  attemptRequest,
+  leaseLapse,
+  Transport,
+  TckError,
+  type Profile,
+} from "./Domain.js";
 import { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
 import { OutageState, checkOutageState } from "./Outage.js";
@@ -73,7 +79,7 @@ export const multinodeIds = (
 };
 export const runMultinode = (options: {
   runId: string;
-  profile: string;
+  profile: Profile;
   seed: number;
   caseId: string;
   durability?: "bucket" | "fleet";
