@@ -1,11 +1,21 @@
 import { Effect } from "effect";
+import assert, { AssertionError } from "node:assert";
 import { Buffer } from "node:buffer";
 import { EventEmitter } from "node:events";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 import { posix } from "node:path";
+import { Readable } from "node:stream";
+import { setImmediate, setTimeout as delay } from "node:timers/promises";
+import {
+  format,
+  inspect,
+  isDeepStrictEqual,
+  promisify,
+  types,
+} from "node:util";
 import { gzipSync, gunzipSync, deflateSync, inflateSync } from "node:zlib";
-import { platform } from "../core/Platform.js";
+import { operation, platform, rejection } from "../core/Platform.js";
 import core from "../core/worker.js";
 export { Probe, Service, TestWorkflow } from "../core/worker.js";
 export default {
@@ -77,6 +87,147 @@ export default {
                 Buffer.from("789ccb48cdc9c95738b71b000f2203be", "hex"),
               ).toString(),
               deflateBytes: deflateSync(bytes).toString("base64"),
+            });
+          }
+          case "/node/util": {
+            const join = (
+              value: string,
+              done: (error: Error | null, result: string) => void,
+            ) => {
+              done(null, `value:${value}`);
+            };
+            const broken = (done: (error: Error) => void) => {
+              done(new TypeError("promisified failure"));
+            };
+            return Response.json({
+              promisified: yield* platform(() => promisify(join)("x")),
+              promisifiedError: yield* rejection(
+                platform(() => promisify(broken)()),
+              ),
+              inspect: inspect({ a: 1, b: [1, 2], c: "λ" }),
+              inspectDepth: inspect({ a: { b: { c: { d: 1 } } } }),
+              format: format("%s:%d:%j", "x", 2, { a: 1 }),
+              types: {
+                date: types.isDate(new Date()),
+                view: types.isArrayBufferView(new TextEncoder().encode("λ")),
+                promise: types.isPromise(Promise.resolve()),
+                map: types.isMap(new Map()),
+                notDate: types.isDate({}),
+              },
+              deepEqual: [
+                isDeepStrictEqual({ a: [1] }, { a: [1] }),
+                isDeepStrictEqual({ a: 1 }, { a: "1" }),
+              ],
+              // node:util re-exports the same WHATWG encoders as the global scope.
+              sharedEncoder: [
+                new TextEncoder().encode("λ").length,
+                new TextDecoder().decode(new Uint8Array([206, 187])),
+              ],
+            });
+          }
+          case "/node/assert": {
+            const failure = (body: () => void) =>
+              operation(body).pipe(
+                Effect.as("accepted" as unknown),
+                Effect.catch((cause) =>
+                  Effect.succeed(
+                    cause instanceof AssertionError
+                      ? {
+                          name: cause.name,
+                          code: cause.code,
+                          operator: cause.operator,
+                          actual: cause.actual,
+                          expected: cause.expected,
+                        }
+                      : {
+                          name: cause instanceof Error ? cause.name : "Unknown",
+                        },
+                  ),
+                ),
+              );
+            return Response.json({
+              satisfied: yield* failure(() => {
+                assert.ok(true);
+                assert.strictEqual("λ", "λ");
+                assert.deepStrictEqual({ a: [1] }, { a: [1] });
+              }),
+              strictEqual: yield* failure(() => {
+                assert.strictEqual(1, 2);
+              }),
+              deepStrictEqual: yield* failure(() => {
+                assert.deepStrictEqual({ a: [1] }, { a: [2] });
+              }),
+              // deepStrictEqual is type sensitive where deepEqual is not.
+              typeSensitive: yield* failure(() => {
+                assert.deepStrictEqual({ a: 1 }, { a: "1" });
+              }),
+              throws: yield* failure(() => {
+                assert.throws(() => {
+                  // oxlint-disable-next-line effect/throw-in-effect-gen -- assert.throws is specified in terms of a native throw; the failure adapter captures it.
+                  throw new TypeError("expected");
+                }, TypeError);
+              }),
+              // A body that never throws is the specified "missing expected
+              // exception" failure, independent of error-class matching rules.
+              throwsMissing: yield* failure(() => {
+                assert.throws(() => undefined, TypeError);
+              }),
+              rejects: yield* rejection(
+                platform(() =>
+                  assert.rejects(
+                    Promise.reject(new TypeError("expected")),
+                    TypeError,
+                  ),
+                ),
+              ),
+              resolvedNotRejected: yield* rejection(
+                platform(() => assert.rejects(Promise.resolve())),
+              ),
+            });
+          }
+          case "/node/stream-timers": {
+            const reader = Readable.toWeb(
+              Readable.from(["a", "λ"]),
+            ).getReader();
+            const chunks: unknown[] = [];
+            for (;;) {
+              const next = yield* platform(() => reader.read());
+              if (next.done) break;
+              chunks.push(next.value);
+            }
+            const binary = yield* platform(() =>
+              new Response(
+                Readable.toWeb(
+                  Readable.from([
+                    new Uint8Array([0, 128]),
+                    new Uint8Array([255]),
+                  ]),
+                ) as unknown as ReadableStream,
+              ).arrayBuffer(),
+            );
+            const fromWeb = yield* platform(async () => {
+              const parts: string[] = [];
+              for await (const chunk of Readable.fromWeb(
+                new Response("aλ").body as never,
+              ))
+                parts.push(Buffer.from(chunk as Uint8Array).toString("utf8"));
+              return parts.join("");
+            });
+            return Response.json({
+              chunks,
+              chunkType: typeof chunks[0],
+              binary: [...new Uint8Array(binary)],
+              fromWeb,
+              // The shorter sleep must settle first; both are real timers.
+              race: yield* platform(() =>
+                Promise.race([delay(1, "fast"), delay(60, "slow")]),
+              ),
+              immediate: yield* platform(() => setImmediate("soon")),
+              aborted: yield* rejection(
+                platform(() =>
+                  delay(60_000, "never", { signal: AbortSignal.abort() }),
+                ),
+              ),
             });
           }
           default:
