@@ -183,6 +183,9 @@ const knownBugMutations: Record<string, Mutation> = {
   "crypto.invalid-input": {
     name: "a still-enforced rejection changes class",
     changes: [{ path: ["body", "emptyIv"], value: "accepted" }],
+  "node.stream-timers": {
+    name: "a conforming timer result breaks alongside the known bug",
+    changes: [{ path: ["body", "race"], value: "slow" }],
   "repro.body-readers": {
     name: "fresh body is already marked used",
     changes: [{ path: ["body", 0, "before"], value: true }],

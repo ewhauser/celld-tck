@@ -53,6 +53,15 @@
       "owner": "celld-tck maintainers",
       "reviewedAt": "2026-09-18",
       "upstreamIssue": null
+    },
+    {
+      "id": "CELL-006",
+      "title": "node:stream Readable.toWeb and Readable.fromWeb throw TypeError",
+      "status": "open",
+      "report": "upstream/node-stream-web-interop.md",
+      "owner": "celld-tck maintainers",
+      "reviewedAt": "2026-09-18",
+      "upstreamIssue": null
     }
   ],
   "expectations": [
@@ -418,6 +427,29 @@
       },
       "compatibilityDate": "2026-07-30",
       "compatibilityFlags": []
+    },
+    {
+      "caseId": "node.stream-timers",
+      "bugIds": ["CELL-006"],
+      "celldVersion": "0.5.0",
+      "evidenceRun": "tck-3168c226-4b59-4847-b179-739fd47fa9f7",
+      "candidate": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "chunks": "TypeError",
+          "chunkType": null,
+          "binary": "TypeError",
+          "fromWeb": "TypeError",
+          "race": "fast",
+          "immediate": "soon",
+          "aborted": "AbortError"
+        }
+      },
+      "compatibilityDate": "2026-07-30",
+      "compatibilityFlags": ["nodejs_compat"]
     }
   ]
 }

@@ -9,8 +9,9 @@ The two original failing TCK cases reduce to three independently actionable repo
 3. [Uncloneable storage values throw TypeError instead of DataCloneError](storage-clone-errors.md).
 4. [EC public key export returns SPKI for the raw format and omits JWK metadata](webcrypto-ec-key-export.md).
 5. [SubtleCrypto does not enforce key usages or key lengths](webcrypto-input-validation.md).
+6. [`node:stream` Readable.toWeb/fromWeb throw TypeError](node-stream-web-interop.md).
 
-Reports 4 and 5 were found by the Web Crypto cases in the regular `core` suite, not by the isolated `repros` fixture; reproduce them with `pnpm tck --profile local --suite core --case crypto.ecdsa-p256` and `--case crypto.invalid-input`, evidence run `tck-0c3c37cf-d018-4e54-b741-aeec138d7628`. Their source investigation is not pinned to an upstream commit.
+Reports 4 to 6 were found by the runtime API cases in the regular `core` and `node` suites, not by the isolated `repros` fixture. Reproduce them with `pnpm tck --profile local --suite core --case crypto.ecdsa-p256`, `--suite core --case crypto.invalid-input` (evidence run `tck-0c3c37cf-d018-4e54-b741-aeec138d7628`), and `--suite node --case node.stream-timers` (evidence run `tck-3168c226-4b59-4847-b179-739fd47fa9f7`). Their source investigation is not pinned to an upstream commit.
 
 A later report came from the extensions suite rather than the repro fixture:
 

@@ -79,7 +79,7 @@ Implemented coverage and limits are in [EXTENSIONS.md](EXTENSIONS.md).
 
 Document whether each reference result comes from local workerd emulation or managed Cloudflare. Do not treat their service guarantees as interchangeable.
 
-The Web Crypto and messaging work registered one documented divergence (`crypto.key-export`: celld cannot export a secret key as `jwk`) and two known bugs, CELL-004 and CELL-005, in [BUGS.md](BUGS.md).
+The Web Crypto and messaging work registered one documented divergence (`crypto.key-export`: celld cannot export a secret key as `jwk`) and three known bugs, CELL-004 to CELL-006, in [BUGS.md](BUGS.md).
 
 ## 6. Fleet operations and binary upgrades
 
