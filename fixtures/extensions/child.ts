@@ -1,5 +1,21 @@
 import { DurableObject } from "cloudflare:workers";
 import { Effect } from "effect";
+import { platform } from "../shared/Platform.js";
+
+interface ChildEnv {
+  readonly TOKEN?: string;
+  readonly COUNT?: number;
+  readonly UPSTREAM?: Fetcher;
+}
+const text = (response: Response) => platform(() => response.text());
+const upstream = (env: ChildEnv, path: string) => {
+  const binding = env.UPSTREAM;
+  return binding === undefined
+    ? Effect.succeed("no binding")
+    : platform(() => binding.fetch(`https://gateway.invalid${path}`)).pipe(
+        Effect.flatMap(text),
+      );
+};
 export class Counter extends DurableObject {
   fetch() {
     return Effect.runPromise(
@@ -18,8 +34,84 @@ export class Counter extends DurableObject {
     );
   }
 }
+export class Ledger extends DurableObject {
+  fetch(request: Request) {
+    return Effect.runPromise(
+      Effect.gen({ self: this }, function* () {
+        const storage = this.ctx.storage;
+        switch (new URL(request.url).searchParams.get("op")) {
+          case "seed":
+            yield* platform(() => storage.put("balance", 10));
+            return Response.json({ seeded: true });
+          case "commit":
+            return Response.json({
+              inside: yield* platform(() =>
+                storage.transaction((tx) =>
+                  Effect.runPromise(
+                    Effect.gen(function* () {
+                      yield* platform(() => tx.put("balance", 20));
+                      return yield* platform(() => tx.get<number>("balance"));
+                    }),
+                  ),
+                ),
+              ),
+            });
+          case "rollback":
+            return Response.json({
+              inside: yield* platform(() =>
+                storage.transaction((tx) =>
+                  Effect.runPromise(
+                    Effect.gen(function* () {
+                      yield* platform(() => tx.put("balance", 30));
+                      const read = yield* platform(() =>
+                        tx.get<number>("balance"),
+                      );
+                      tx.rollback();
+                      return read;
+                    }),
+                  ),
+                ),
+              ),
+            });
+          default:
+            return Response.json({
+              balance:
+                (yield* platform(() => storage.get<number>("balance"))) ?? null,
+            });
+        }
+      }),
+    );
+  }
+}
 export default {
-  fetch() {
-    return Effect.runPromise(Effect.succeed(new Response("dynamic λ")));
+  fetch(request: Request, env: ChildEnv, ctx: ExecutionContext) {
+    return Effect.runPromise(
+      Effect.gen(function* () {
+        switch (new URL(request.url).pathname) {
+          case "/props":
+            return Response.json({ props: ctx.props ?? null });
+          case "/env":
+            return Response.json({
+              token: env.TOKEN ?? null,
+              count: env.COUNT ?? null,
+              upstream: yield* upstream(env, "/binding"),
+            });
+          case "/outbound":
+            return Response.json({
+              global: yield* platform(() =>
+                fetch("https://outbound.invalid/global"),
+              ).pipe(
+                Effect.flatMap(text),
+                // The documented contract is that the call throws; the error
+                // class is not part of it, so only the outcome is observed.
+                Effect.catch(() => Effect.succeed("blocked")),
+              ),
+              binding: yield* upstream(env, "/binding"),
+            });
+          default:
+            return new Response("dynamic λ");
+        }
+      }),
+    );
   },
 };

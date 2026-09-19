@@ -133,15 +133,20 @@
     },
     {
       "family": "assets",
-      "cases": ["assets.binding"]
+      "cases": ["assets.binding", "assets.html-routing", "assets.redirects"]
     },
     {
       "family": "dynamic",
-      "cases": ["dynamic.fetch"]
+      "cases": [
+        "dynamic.fetch",
+        "dynamic.props",
+        "dynamic.bindings",
+        "dynamic.outbound"
+      ]
     },
     {
       "family": "facets",
-      "cases": ["facets.isolation"]
+      "cases": ["facets.isolation", "facets.transaction"]
     },
     {
       "family": "context",
