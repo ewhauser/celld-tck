@@ -52,45 +52,161 @@ export interface ProbeResult {
 
 const clamp = (value: string) => value.slice(0, 4096);
 
+/** Decodes a chunked transfer body; returns undefined until the final chunk arrives. */
+const dechunk = (raw: string): string | undefined => {
+  let offset = 0;
+  let out = "";
+  for (;;) {
+    const lineEnd = raw.indexOf("\r\n", offset);
+    if (lineEnd === -1) return undefined;
+    const size = Number.parseInt(raw.slice(offset, lineEnd), 16);
+    if (!Number.isInteger(size)) return undefined;
+    if (size === 0) return out;
+    const dataStart = lineEnd + 2;
+    if (raw.length < dataStart + size + 2) return undefined;
+    out += raw.slice(dataStart, dataStart + size);
+    offset = dataStart + size + 2;
+  }
+};
+
+/** A parsed response, or undefined while the wire is still incomplete. */
+export const parseHttp = (
+  label: string,
+  wire: string,
+): ProbeResult | undefined => {
+  const separator = wire.indexOf("\r\n\r\n");
+  if (separator === -1) return undefined;
+  const parsed = parseRaw(label, wire);
+  if (parsed.error !== undefined || parsed.headers === undefined) return parsed;
+  const raw = wire.slice(separator + 4);
+  if (parsed.headers["transfer-encoding"]?.includes("chunked")) {
+    const body = dechunk(raw);
+    return body === undefined ? undefined : { ...parsed, body: clamp(body) };
+  }
+  const declared = Number(parsed.headers["content-length"] ?? "0");
+  return Buffer.byteLength(raw) < declared ? undefined : parsed;
+};
+
+const chunkFrame = (data: Buffer) =>
+  Buffer.concat([
+    Buffer.from(`${data.length.toString(16)}\r\n`),
+    data,
+    Buffer.from("\r\n"),
+  ]);
+
+// A raw socket rather than fetch or node:http: celld answers an oversized
+// upload with 413 and closes while the client is still sending. Both HTTP
+// clients turn the resulting write error into a failed request and discard the
+// response they had already received. Here the request head is sent first,
+// the body follows in paced slices only while no response has arrived, and
+// whatever the server wrote is parsed even if a later write fails.
 const httpProbe = (probe: HttpProbe) =>
-  Effect.tryPromise({
-    try: async (): Promise<ProbeResult> => {
-      const stream = probe.chunks;
-      const body = stream
-        ? new ReadableStream<Uint8Array>({
-            start(controller) {
-              for (let index = 0; index < stream.count; index++)
-                controller.enqueue(new Uint8Array(stream.bytes).fill(120));
-              controller.close();
-            },
-          })
-        : probe.bodyBytes !== undefined
-          ? "x".repeat(probe.bodyBytes)
-          : probe.bodyJson
-            ? JSON.stringify({
+  Effect.callback<ProbeResult>((resume) => {
+    const url = new URL(probe.url);
+    const port = Number(url.port || (url.protocol === "https:" ? 443 : 80));
+    const stream = probe.chunks;
+    const body =
+      probe.bodyBytes !== undefined
+        ? Buffer.alloc(probe.bodyBytes, 120)
+        : probe.bodyJson
+          ? Buffer.from(
+              JSON.stringify({
                 id: probe.bodyJson.id,
                 payload: "x".repeat(probe.bodyJson.payloadBytes),
-              })
-            : probe.body;
-      // oxlint-disable-next-line effect/use-http-client-service -- Runs inside the sidecar container, outside the harness runtime.
-      const response = await fetch(probe.url, {
-        method: probe.method ?? "GET",
-        ...(probe.headers ? { headers: probe.headers } : {}),
-        ...(body === undefined ? {} : { body, duplex: "half" }),
-        signal: AbortSignal.timeout(probe.timeoutMs ?? 20000),
-      } as RequestInit);
-      return {
-        label: probe.label,
-        status: response.status,
-        headers: Object.fromEntries(response.headers),
-        body: clamp(await response.text()),
-      };
-    },
-    catch: (error): ProbeResult => ({
-      label: probe.label,
-      error: String(error),
-    }),
-  }).pipe(Effect.catch(Effect.succeed));
+              }),
+            )
+          : probe.body === undefined
+            ? undefined
+            : Buffer.from(probe.body);
+    const headers: Record<string, string> = {
+      host: url.host,
+      connection: "close",
+      ...Object.fromEntries(
+        Object.entries(probe.headers ?? {}).map(([name, value]) => [
+          name.toLowerCase(),
+          value,
+        ]),
+      ),
+      ...(stream
+        ? { "transfer-encoding": "chunked" }
+        : body
+          ? { "content-length": String(body.length) }
+          : {}),
+    };
+    const head =
+      `${probe.method ?? "GET"} ${url.pathname}${url.search} HTTP/1.1\r\n` +
+      Object.entries(headers)
+        .map(([name, value]) => `${name}: ${value}\r\n`)
+        .join("") +
+      "\r\n";
+    let settled = false;
+    let wire = "";
+    const timers: NodeJS.Timeout[] = [];
+    const settle = (result: ProbeResult) => {
+      if (settled) return;
+      settled = true;
+      for (const timer of timers) clearTimeout(timer);
+      socket.destroy();
+      resume(Effect.succeed(result));
+    };
+    const later = (ms: number, work: () => void) => {
+      timers.push(setTimeout(work, ms));
+    };
+    // Slices are sent only while the server is silent; the first response byte
+    // ends the upload so the denial is never raced by further writes.
+    const send = (frames: readonly Buffer[], index: number) => {
+      if (settled || wire.length > 0 || socket.destroyed) return;
+      // Never half-close: celld drops a request whose client sends FIN before
+      // the response, so `connection: close` leaves the hang-up to the server.
+      if (index === frames.length) {
+        if (stream) socket.write("0\r\n\r\n");
+        return;
+      }
+      socket.write(frames[index]!, () =>
+        later(stream ? 20 : 0, () => send(frames, index + 1)),
+      );
+    };
+    const frames: Buffer[] = stream
+      ? Array.from({ length: stream.count }, () =>
+          chunkFrame(Buffer.alloc(stream.bytes, 120)),
+        )
+      : body
+        ? Array.from({ length: Math.ceil(body.length / 16384) }, (_, i) =>
+            body.subarray(i * 16384, (i + 1) * 16384),
+          )
+        : [];
+    const socket = connect(port, url.hostname, () => {
+      socket.write(head, () => {
+        // Give a length-based rejection a moment to arrive before uploading.
+        if (frames.length) later(100, () => send(frames, 0));
+      });
+    });
+    socket.setTimeout(probe.timeoutMs ?? 20000, () =>
+      settle({ label: probe.label, error: "timeout" }),
+    );
+    socket.on("data", (chunk) => {
+      wire += String(chunk);
+      const complete = parseHttp(probe.label, wire);
+      if (complete) settle(complete);
+    });
+    socket.on("error", (error) => {
+      // A write failure after the server responded is the server hanging up on
+      // the rest of a rejected upload; the response already on the wire wins.
+      if (wire.length === 0)
+        settle({ label: probe.label, error: String(error) });
+    });
+    socket.on("close", () =>
+      settle(
+        wire.length === 0
+          ? { label: probe.label, error: "closed without a response" }
+          : (parseHttp(probe.label, wire) ?? parseRaw(probe.label, wire)),
+      ),
+    );
+    return Effect.sync(() => {
+      for (const timer of timers) clearTimeout(timer);
+      socket.destroy();
+    });
+  });
 
 export const parseRaw = (label: string, wire: string): ProbeResult => {
   const separator = wire.indexOf("\r\n\r\n");
