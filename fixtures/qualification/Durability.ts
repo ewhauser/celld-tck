@@ -1,14 +1,27 @@
 import { Effect } from "effect";
 import { operation, platform, rejection } from "../core/Platform.js";
 
+/** Marker the driver uses to attribute a failure to abort() rather than to sync(). */
+export const abortMarker = "tck-object-abort";
+/** Marker the driver uses to attribute a rejection to the explicit sync() barrier. */
+export const syncMarker = "tck-sync-rejected:";
+const describe = (cause: unknown) =>
+  cause instanceof Error ? cause.message : String(cause);
+const barrier = (storage: DurableObjectStorage) =>
+  platform(() => storage.sync()).pipe(
+    Effect.as("resolved" as string),
+    Effect.catch((cause) => Effect.succeed(`${syncMarker} ${describe(cause)}`)),
+  );
+
 // Fixture operations only. The driver checks rejection, state, and recovery.
 export const durabilityOperation = (
   ctx: DurableObjectState,
-  path: string,
+  url: URL,
   retain: (cursor: ReturnType<SqlStorage["exec"]>) => void,
   witness: () => Promise<Response>,
 ) =>
   Effect.gen(function* () {
+    const path = url.pathname;
     if (!path.startsWith("/durability/")) return undefined;
     const storage = ctx.storage;
     if (path === "/durability/witness-write") {
@@ -140,6 +153,54 @@ export const durabilityOperation = (
         rejected: error !== "accepted",
         remaining,
       });
+    }
+    if (path === "/durability/sync-abort") {
+      yield* platform(() =>
+        storage.put("durable", "after", { allowUnconfirmed: true }),
+      );
+      // The barrier is armed synchronously because abort() resets the object
+      // immediately: a lazily started sync() would never be pending at the reset.
+      const armed = storage.sync();
+      // Attach handlers now so the reset cannot surface an unhandled rejection,
+      // and keep the two failure sources textually distinguishable.
+      const pending = armed.then(
+        () => "resolved",
+        (cause: unknown) => `${syncMarker} ${describe(cause)}`,
+      );
+      ctx.abort(abortMarker);
+      const settled = yield* platform(() => pending).pipe(
+        Effect.timeout("2 seconds"),
+        Effect.catch(() => Effect.succeed("unsettled")),
+      );
+      return Response.json({ pending: settled });
+    }
+    if (path === "/durability/sync-barrier") {
+      const holdMs = Number(url.searchParams.get("hold") ?? 0);
+      if (!Number.isInteger(holdMs) || holdMs < 0 || holdMs > 60000)
+        return new Response("invalid hold", { status: 400 });
+      const deadline = Date.now() + holdMs;
+      const rounds: Array<{
+        round: number;
+        outcome: string;
+        elapsedMs: number;
+      }> = [];
+      let round = 0;
+      while (Date.now() < deadline) {
+        round++;
+        // allowUnconfirmed keeps the output gate open, so only the explicit
+        // barrier below can hold this request open.
+        yield* platform(() =>
+          storage.put("durable", `barrier-${round}`, {
+            allowUnconfirmed: true,
+          }),
+        );
+        const started = Date.now();
+        const outcome = yield* barrier(storage);
+        rounds.push({ round, outcome, elapsedMs: Date.now() - started });
+        if (outcome !== "resolved") break;
+        yield* Effect.sleep("100 millis");
+      }
+      return Response.json({ rounds, value: storage.kv.get("durable") });
     }
     return new Response("Unknown durability operation", { status: 404 });
   });
