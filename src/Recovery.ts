@@ -18,10 +18,39 @@ import { makeSuiteExecutor } from "./SuiteExecutor.js";
 export const recoveryIds = [
   "recovery.graceful",
   "recovery.crash",
+  "recovery.facets",
   "recovery.overdue-alarm",
   "recovery.disk-loss",
   "recovery.storage-outage",
 ] as const;
+const FacetSnapshot = Schema.Struct({
+  activation: Schema.String,
+  balance: Schema.Unknown,
+  rows: Schema.Unknown,
+});
+// A facet keeps its own SQLite database, which the runtime replicates with the
+// root Durable Object: the seeded facet state must survive a restart intact.
+export const checkFacetsRecovered = (
+  before: string,
+  value: typeof FacetSnapshot.Type,
+) =>
+  Effect.gen(function* () {
+    if (before === value.activation)
+      return yield* Effect.fail(
+        new TckError({
+          phase: "assertion",
+          message: "Durable Object activation did not change",
+        }),
+      );
+    yield* equal(
+      { ...value, activation: undefined },
+      {
+        activation: undefined,
+        balance: 10,
+        rows: [{ id: 1, value: "facet λ" }],
+      },
+    );
+  });
 const Snapshot = Schema.Struct({
   activation: Schema.String,
   retained: Schema.Unknown,
@@ -133,6 +162,38 @@ export const runRecovery = (options: {
           id,
           () =>
             Effect.gen(function* () {
+              if (id === "recovery.facets") {
+                const seeded = yield* request("/facet/seed", name, "POST").pipe(
+                  Effect.flatMap(
+                    Schema.decodeUnknownEffect(
+                      Schema.Struct({
+                        seeded: Schema.Literal(true),
+                        activation: Schema.String,
+                      }),
+                    ),
+                  ),
+                );
+                const readFacet = () =>
+                  request("/facet/state", name).pipe(
+                    Effect.flatMap(Schema.decodeUnknownEffect(FacetSnapshot)),
+                  );
+                const before = yield* readFacet();
+                // Prove the seeded state without requiring a new activation.
+                yield* checkFacetsRecovered("not-an-activation", before);
+                yield* equal(before.activation, seeded.activation);
+                yield* lifecycle.stop(false);
+                yield* leaseLapse;
+                target = yield* lifecycle.start();
+                yield* ready();
+                const restored = yield* readFacet();
+                yield* artifacts.json(`${id}-observations.json`, {
+                  seeded,
+                  before,
+                  restored,
+                });
+                yield* checkFacetsRecovered(seeded.activation, restored);
+                return restored;
+              }
               if (id === "recovery.storage-outage") {
                 const recovered = yield* runOutage(target, name, lifecycle);
                 target = recovered.target;

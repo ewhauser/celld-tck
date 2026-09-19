@@ -7,4 +7,5 @@
     "bindings": [{ "name": "PROBE", "class_name": "Recovery" }],
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Recovery"] }],
+  "worker_loaders": [{ "binding": "LOADER" }],
 }
