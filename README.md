@@ -108,6 +108,7 @@ Every new case needs a meaningful negative example that its actual checker rejec
 - [Coverage roadmap](docs/ROADMAP.md) and [qualification backlog](docs/BACKLOG.md)
 - [In-place deployment coverage](docs/IN-PLACE-DEPLOYMENT.md)
 - [Assets, dynamic Workers, and facets](docs/EXTENSIONS.md)
+- [Runtime and service breadth](docs/RUNTIME-BREADTH.md)
 - [Security boundaries](docs/SECURITY-BOUNDARIES.md)
 
 ## License

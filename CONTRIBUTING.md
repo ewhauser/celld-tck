@@ -20,7 +20,7 @@ Fixtures and tests may construct and inspect native errors to exercise runtime s
 
 ## Adding cases
 
-Add API cases in `src/CoreCases.ts`, `src/ServiceCases.ts`, `src/NodeCases.ts`, or `src/ExtensionCases.ts`, and register their IDs in `docs/coverage.json`. Keep fixtures identical across runtimes: fixtures perform operations and return observations; the driver owns assertions.
+Add API cases in `src/CoreCases.ts`, `src/ServiceCases.ts`, `src/NodeCases.ts`, `src/FlagCases.ts`, or `src/ExtensionCases.ts`, and register their IDs in `docs/coverage.json`. A case that needs different compatibility flags belongs in a fixture variant: `Build.ts` rebuilds the same worker under the variant's flags, and `Domain.ts`, `Runner.ts`'s fixture loop, `Suites.ts`, and `Catalog.ts` each name it once. Keep fixtures identical across runtimes: fixtures perform operations and return observations; the driver owns assertions.
 
 Every new case needs a targeted negative example exercising its actual oracle. For API cases, add an independently reviewed positive observation to `test/case-oracles/observations.json` and at least one named semantic mutation in `test/case-oracles/Mutations.ts`. `pnpm check` enforces exact coverage of the case registry and tests the real checker against each mutation, including matching wrong reference/candidate observations. Generic HTTP failures, malformed envelopes, and no-op mutations do not count. See [the oracle corpus guide](test/case-oracles/README.md) for the authoring workflow. Lifecycle and qualification cases must likewise include targeted bad observations in their oracle tests.
 
