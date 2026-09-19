@@ -25,6 +25,10 @@
     {
       "runId": "tck-874df9a3-64c6-4e4e-8dad-82995972fca3",
       "sourceRevision": "413ce135411c4a2445feb4e992ad5a375160d79c"
+    },
+    {
+      "runId": "tck-082f810e-5fb7-477b-a9bd-f202de438ca7",
+      "sourceRevision": "f9f2e538db459a5ef0270b25cd003037d42590cd"
     }
   ],
   "cases": {
@@ -1724,6 +1728,151 @@
             "n": 3
           }
         ]
+      }
+    },
+    "assets.html-routing": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "page": {
+          "status": 200,
+          "location": null,
+          "contentType": "text/html; charset=utf-8",
+          "page": "html",
+          "body": "<!doctype html>\n<title>tck page</title>"
+        },
+        "pageHtml": {
+          "status": 307,
+          "location": "/page",
+          "contentType": null,
+          "page": null,
+          "body": ""
+        },
+        "folder": {
+          "status": 307,
+          "location": "/folder/",
+          "contentType": null,
+          "page": null,
+          "body": ""
+        },
+        "folderSlash": {
+          "status": 200,
+          "location": null,
+          "contentType": "text/html; charset=utf-8",
+          "page": null,
+          "body": "<!doctype html>\n<title>tck folder index</title>"
+        },
+        "missing": {
+          "status": 404,
+          "location": null,
+          "contentType": null,
+          "page": null,
+          "body": ""
+        }
+      }
+    },
+    "assets.redirects": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "permanent": {
+          "status": 301,
+          "location": "/page",
+          "contentType": null,
+          "page": null,
+          "body": ""
+        },
+        "temporary": {
+          "status": 302,
+          "location": "/page",
+          "contentType": null,
+          "page": null,
+          "body": ""
+        },
+        "unmatched": {
+          "status": 404,
+          "location": null,
+          "contentType": null,
+          "page": null,
+          "body": ""
+        }
+      }
+    },
+    "dynamic.props": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "tenant": {
+          "props": {
+            "tenant": "alpha",
+            "seed": 7
+          }
+        },
+        "other": {
+          "props": {
+            "tenant": "beta",
+            "seed": 9
+          }
+        }
+      }
+    },
+    "dynamic.bindings": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "token": "token λ",
+        "count": 3,
+        "upstream": "gateway /binding"
+      }
+    },
+    "dynamic.outbound": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "blocked": {
+          "global": "blocked",
+          "binding": "gateway /binding"
+        },
+        "gateway": {
+          "global": "gateway /global",
+          "binding": "gateway /binding"
+        }
+      }
+    },
+    "facets.transaction": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "seeded": {
+          "seeded": true
+        },
+        "initial": {
+          "balance": 10
+        },
+        "commit": {
+          "inside": 20
+        },
+        "committed": {
+          "balance": 20
+        },
+        "rollback": {
+          "inside": 30
+        },
+        "restored": {
+          "balance": 20
+        }
       }
     }
   },

@@ -453,11 +453,99 @@ export const mutations = {
     ),
     body("asset binding loses file contents", "text", ""),
   ],
+  "assets.html-routing": [
+    mutate(
+      "extensionless path does not serve its HTML asset",
+      change(["body", "page", "status"], 404),
+      change(["body", "page", "body"], ""),
+    ),
+    mutate(
+      "the .html path serves the asset instead of redirecting",
+      change(["body", "pageHtml", "status"], 200),
+      change(["body", "pageHtml", "location"], null),
+    ),
+    mutate(
+      "a directory serves its index without the trailing-slash redirect",
+      change(["body", "folder", "status"], 200),
+      change(["body", "folder", "location"], null),
+    ),
+    mutate(
+      "a missing path falls back to an existing page",
+      change(["body", "missing", "status"], 200),
+      change(
+        ["body", "missing", "body"],
+        "<!doctype html>\n<title>tck page</title>",
+      ),
+    ),
+    mutate(
+      "a _headers rule does not reach the HTML asset",
+      change(["body", "page", "page"], null),
+    ),
+  ],
+  "assets.redirects": [
+    mutate(
+      "a _redirects rule is ignored",
+      change(["body", "permanent", "status"], 404),
+      change(["body", "permanent", "location"], null),
+    ),
+    mutate(
+      "a temporary redirect is served as permanent",
+      change(["body", "temporary", "status"], 301),
+    ),
+    mutate(
+      "an unmatched path picks up a redirect target",
+      change(["body", "unmatched", "status"], 302),
+      change(["body", "unmatched", "location"], "/page"),
+    ),
+  ],
   "dynamic.fetch": [
     body("dynamic worker is not invoked", "text", "static fallback"),
   ],
+  "dynamic.props": [
+    mutate("per-call props are lost", change(["body", "tenant", "props"], {})),
+    mutate(
+      "a reused loaded Worker keeps the first call's props",
+      change(["body", "other", "props"], { tenant: "alpha", seed: 7 }),
+    ),
+  ],
+  "dynamic.bindings": [
+    body("a structured-clone env value is lost", "token", null),
+    body(
+      "a service capability in env does not reach its entrypoint",
+      "upstream",
+      "no binding",
+    ),
+  ],
+  "dynamic.outbound": [
+    mutate(
+      "globalOutbound null does not block a global fetch",
+      change(["body", "blocked", "global"], "gateway /global"),
+    ),
+    mutate(
+      "a blocked outbound also disables an env service binding",
+      change(["body", "blocked", "binding"], "blocked"),
+    ),
+    mutate(
+      "a globalOutbound gateway does not intercept a global fetch",
+      change(["body", "gateway", "global"], "blocked"),
+    ),
+  ],
   "facets.isolation": [
     body("one facet's counter leaks into a different facet", "c", { n: 3 }),
+  ],
+  "facets.transaction": [
+    mutate(
+      "a committed facet transaction is discarded",
+      change(["body", "committed", "balance"], 10),
+    ),
+    mutate(
+      "a rolled back facet transaction keeps its writes",
+      change(["body", "restored", "balance"], 30),
+    ),
+    mutate(
+      "a facet transaction does not read its own uncommitted write",
+      change(["body", "rollback", "inside"], 20),
+    ),
   ],
   "repro.body-readers": [
     mutate(
