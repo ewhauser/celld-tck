@@ -20,6 +20,23 @@ const blob = (id: number) => {
   return bytes;
 };
 const Write = Schema.Struct({ id: Schema.String, payload: Schema.String });
+/**
+ * The one outbound target the telemetry fixture will call. The driver supplies
+ * the address because the fixture must not know the test topology, but the
+ * fixture pins the scheme and the path so the route cannot be used as a proxy.
+ */
+const traceSink = (value: string | null) => {
+  if (!value) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return undefined;
+  }
+  return parsed.protocol === "http:" && parsed.pathname === "/trace/sink"
+    ? parsed.toString()
+    : undefined;
+};
 export class Recovery extends DurableObject<QualificationEnv> {
   private readonly activation = crypto.randomUUID();
   private durabilityCursor: ReturnType<SqlStorage["exec"]> | undefined;
@@ -282,6 +299,21 @@ export class Recovery extends DurableObject<QualificationEnv> {
           }
           return Response.json({ count, bytes });
         }
+        // Observation only. Emits two log lines around an await so the driver
+        // can check that celld keeps the handler's trace context across
+        // asynchronous work, then makes one outbound call and reports the
+        // `traceparent` the downstream actually received.
+        if (url.pathname === "/trace/chain") {
+          const marker = url.searchParams.get("marker") ?? "";
+          console.log(`${marker}:cell`);
+          yield* Effect.sleep("25 millis");
+          console.log(`${marker}:cell-await`);
+          const sink = traceSink(url.searchParams.get("sink"));
+          if (!sink) return new Response("invalid sink", { status: 400 });
+          const response = yield* platform(() => fetch(sink));
+          const echoed = yield* platform(() => response.json());
+          return Response.json({ downstream: echoed, status: response.status });
+        }
         if (url.pathname === "/events")
           return Response.json([...storage.kv.list({ prefix: "event:" })]);
         return new Response("not found", { status: 404 });
@@ -347,6 +379,21 @@ export default {
             url: request.url,
             host: request.headers.get("host"),
           });
+        // Worker-local, observation only: reports the trace context celld
+        // propagated onto an outbound call, without interpreting it.
+        if (url.pathname === "/trace/sink")
+          return Response.json({
+            traceparent: request.headers.get("traceparent"),
+          });
+        // Worker-local: emits one log line so the driver can resolve which
+        // trace this request ran in. It never reads the incoming header, so
+        // the observation stays independent of what is being asserted.
+        if (url.pathname === "/trace/emit") {
+          console.log(url.searchParams.get("marker") ?? "");
+          return Response.json({ emitted: true });
+        }
+        if (url.pathname === "/trace/chain")
+          console.log(`${url.searchParams.get("marker") ?? ""}:worker`);
         // Worker-local: a Durable Object request may execute on another node.
         if (url.pathname === "/pressure") {
           const mb = Number(url.searchParams.get("mb") ?? 16);

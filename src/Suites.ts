@@ -19,7 +19,8 @@ export type QualificationSuite =
   | "dependencies"
   | "faults"
   | "capacity"
-  | "security";
+  | "security"
+  | "telemetry";
 
 export type SuiteEntry =
   | { readonly name: ApiSuite; readonly kind: "api" }
@@ -69,6 +70,7 @@ export const suiteRegistry: readonly SuiteEntry[] = [
   { name: "faults", kind: "qualification", aggregate: false },
   { name: "capacity", kind: "qualification", aggregate: false },
   { name: "security", kind: "qualification", aggregate: false },
+  { name: "telemetry", kind: "qualification", aggregate: false },
 ];
 
 export const suiteNames: readonly SuiteName[] = suiteRegistry.map(
