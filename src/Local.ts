@@ -32,6 +32,8 @@ const Container = Schema.Struct({
 
 export type LocalOptions = {
   manualReload?: boolean;
+  /** Lowers `CELLD_DEPLOY_MAX_AGE_S` so forced adoption fits the scenario bound. */
+  adoptionDeadline?: boolean;
   runId: string;
   bundle: Bundle;
   cleanupError: (detail: string) => Effect.Effect<void>;
@@ -112,6 +114,7 @@ export const acquireLocal = (options: LocalOptions) =>
         ["qualification.yaml", qualification],
         ["security.yaml", security],
         ["manual-reload.yaml", options.manualReload ?? false],
+        ["adoption-deadline.yaml", options.adoptionDeadline ?? false],
       ] as const
     )
       .filter(([, enabled]) => enabled)
