@@ -34,12 +34,28 @@ export class Counter extends DurableObject {
     );
   }
 }
-export class Ledger extends DurableObject {
+export class Ledger extends DurableObject<ChildEnv> {
   fetch(request: Request) {
     return Effect.runPromise(
       Effect.gen({ self: this }, function* () {
         const storage = this.ctx.storage;
+        const env = this.env;
         switch (new URL(request.url).searchParams.get("op")) {
+          case "outbound": {
+            // Write in the facet, then call out from it. The caller decides
+            // whether a root storage transaction is open around this request.
+            // Only the outcome is reported: where the call is refused, the
+            // error class is not part of the documented contract.
+            yield* platform(() => storage.put("balance", 40));
+            const outbound = yield* upstream(env, "/facet").pipe(
+              Effect.catch(() => Effect.succeed("rejected")),
+            );
+            return Response.json({
+              balance:
+                (yield* platform(() => storage.get<number>("balance"))) ?? null,
+              outbound,
+            });
+          }
           case "seed":
             yield* platform(() => storage.put("balance", 10));
             return Response.json({ seeded: true });

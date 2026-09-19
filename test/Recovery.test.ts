@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { checkRecovered } from "../src/Recovery.js";
+import { checkFacetsRecovered, checkRecovered } from "../src/Recovery.js";
 const state = {
   activation: "new",
   retained: "durable λ",
@@ -30,6 +30,30 @@ it.effect(
         (yield* Effect.exit(checkRecovered("old", state, true)))._tag,
       ).toBe("Failure");
       yield* checkRecovered("old", { ...state, fired: true }, true);
+    }),
+);
+
+const facets = {
+  activation: "new",
+  balance: 10,
+  rows: [{ id: 1, value: "facet λ" }],
+};
+it.effect(
+  "facet recovery requires a new activation and the exact replicated facet state",
+  () =>
+    Effect.gen(function* () {
+      yield* checkFacetsRecovered("old", facets);
+      for (const corrupt of [
+        { ...facets, activation: "old" },
+        { ...facets, balance: null },
+        { ...facets, balance: 0 },
+        { ...facets, rows: [] },
+        { ...facets, rows: [{ id: 1, value: "stale" }] },
+        { ...facets, rows: [...facets.rows, { id: 2, value: "facet λ" }] },
+      ])
+        expect(
+          (yield* Effect.exit(checkFacetsRecovered("old", corrupt)))._tag,
+        ).toBe("Failure");
     }),
 );
 

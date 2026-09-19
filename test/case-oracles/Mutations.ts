@@ -723,6 +723,48 @@ export const mutations = {
       change(["body", "unmatched", "location"], "/page"),
     ),
   ],
+  "assets.worker-first": [
+    mutate(
+      "a worker-first path serves the shadowed asset instead of the Worker",
+      change([0, "body"], "shadowed asset\n"),
+      change([0, "headers", "content-type"], "text/plain; charset=utf-8"),
+    ),
+    mutate(
+      "a negative rule does not restore asset-first order",
+      change([1, "body"], { served: "worker", path: "/asset-first/note.txt" }),
+      change([1, "headers", "content-type"], "application/json"),
+    ),
+    mutate(
+      "the asset-first path loses the asset contents",
+      change([1, "body"], ""),
+    ),
+  ],
+  "dynamic.limits": [
+    body(
+      "declared custom limits drop a structured-clone env value",
+      "token",
+      null,
+    ),
+    body(
+      "a subrequest inside the declared budget is refused",
+      "upstream",
+      "no binding",
+    ),
+  ],
+  "facets.outbound-transaction": [
+    mutate(
+      "an outbound effect from a facet is refused with no root transaction",
+      change(["body", "control", "outbound"], "rejected"),
+    ),
+    mutate(
+      "the facet write made during the root transaction is lost",
+      change(["body", "after", "balance"], 10),
+    ),
+    mutate(
+      "the outbound call during the root transaction reaches the wrong target",
+      change(["body", "inTransaction", "outbound"], "gateway /binding"),
+    ),
+  ],
   "dynamic.fetch": [
     body("dynamic worker is not invoked", "text", "static fallback"),
   ],
@@ -828,6 +870,22 @@ export const divergenceMutations = {
     mutate(
       "unrelated RPC failure is incorrectly waived",
       change(["body", "error", "message"], "network unavailable"),
+    ),
+  ],
+  "dynamic.limits": [
+    mutate(
+      "the limits waiver is stretched to cover a dropped env binding",
+      change(["body"], { token: null, count: 1, upstream: "gateway /binding" }),
+    ),
+  ],
+  "facets.outbound-transaction": [
+    mutate(
+      "the documented restriction is extended to a facet with no open root transaction",
+      change(["body", "control", "outbound"], "rejected"),
+    ),
+    mutate(
+      "the refused outbound also loses the facet write under the waiver",
+      change(["body", "after", "balance"], 10),
     ),
   ],
 } satisfies Record<string, readonly [Mutation, ...Mutation[]]>;
