@@ -28,6 +28,11 @@ export const makeContext = (
   runtime: Effect.Success<ReturnType<typeof acquireLocal>>,
   name: string,
   seed: number,
+  /**
+   * The node the cell is activated on. A new cell is placed where its first
+   * request arrives, so this is how a scenario decides which node owns it.
+   */
+  home: Node = "celld",
 ) =>
   Effect.gen(function* () {
     const transport = yield* Transport;
@@ -67,7 +72,7 @@ export const makeContext = (
         { interval: "500 millis", attempts: 61, timeout: "45 seconds" },
       ).pipe(Effect.asVoid);
     for (const node of nodes) yield* ready(node);
-    const identity = yield* json("/fleet/id").pipe(
+    const identity = yield* json("/fleet/id", home).pipe(
       Effect.flatMap(
         Schema.decodeUnknownEffect(
           Schema.Struct({

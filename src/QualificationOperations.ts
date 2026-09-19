@@ -162,9 +162,18 @@ const settled = (ctx: QualificationContext, nodes: readonly Node[]) =>
  * fixture keys objects by `name`, so a distinct name is a distinct cell, and
  * each one records its own acknowledged writes and its own owner.
  */
-const cells = (ctx: QualificationContext, count: number) =>
+const cells = (
+  ctx: QualificationContext,
+  count: number,
+  home: (index: number) => Node = () => "celld",
+) =>
   Effect.forEach(Array.from({ length: count }), (_, index) =>
-    makeContext(ctx.runtime, `${ctx.name}-cell${index}`, ctx.seed + index),
+    makeContext(
+      ctx.runtime,
+      `${ctx.name}-cell${index}`,
+      ctx.seed + index,
+      home(index),
+    ),
   );
 
 /**
@@ -183,23 +192,44 @@ const ballast = (
       Effect.gen(function* () {
         // The tag keeps two rounds of ballast from naming the same cells.
         const name = `${ctx.name}-${tag}${index}`;
-        const written = yield* ctx.transport.request(ctx.targets[node], {
-          path: `/history/write?name=${name}`,
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ id: `${tag}-${index}`, payload: name }),
-        });
-        yield* equal(written.status, 200);
-        const identity = yield* ctx.transport.request(ctx.targets[node], {
-          path: `/fleet/id?name=${name}`,
-        });
-        yield* equal(identity.status, 200);
+        // Ballast is background load, not evidence, so a cold activation that
+        // the node refuses under contention is retried rather than failing the
+        // scenario. Every acknowledged write under test lives on a ledgered
+        // cell, where no retry is applied.
+        const accepted = (
+          path: string,
+          method: "GET" | "POST",
+          body?: string,
+        ) =>
+          pollUntil(
+            ctx.transport.request(ctx.targets[node], {
+              path,
+              method,
+              timeoutMs: 30000,
+              ...(body === undefined
+                ? {}
+                : { body, headers: { "content-type": "application/json" } }),
+            }),
+            (response) => response.status === 200,
+            {
+              interval: "1 second",
+              attempts: 10,
+              timeout: "60 seconds",
+              message: `Waiting for ${name} to accept a ballast request`,
+            },
+          );
+        yield* accepted(
+          `/history/write?name=${name}`,
+          "POST",
+          JSON.stringify({ id: `${tag}-${index}`, payload: name }),
+        );
+        const identity = yield* accepted(`/fleet/id?name=${name}`, "GET");
         return yield* decodeAs(
           Schema.Struct({ cell: Schema.String }),
           "operations",
         )(identity.body).pipe(Effect.map((decoded) => decoded.cell));
       }),
-    { concurrency: 4 },
+    { concurrency: 2 },
   );
 
 /** Every published endpoint a restarted node hands out has to be re-read. */
@@ -243,6 +273,9 @@ const verifyAll = (members: readonly Cell[], nodes: readonly Node[]) =>
       return yield* member.verify(nodes[0]!);
     }),
   );
+
+/** celld's logs and the bucket keys carry the class-qualified scope. */
+const scope = (cell: string) => `Recovery:${cell}`;
 
 const ownersOf = (owners: OwnershipMap, members: readonly Cell[]) =>
   Object.fromEntries(
@@ -314,15 +347,9 @@ const weightedPlacement = (ctx: QualificationContext) =>
 const rebalanceControl = (ctx: QualificationContext) =>
   Effect.gen(function* () {
     const { fleet, nodes, artifacts } = ctx;
-    const members = yield* cells(ctx, 3);
-    yield* Effect.forEach(members, (member) =>
-      member.writeAcknowledged("celld"),
-    );
-    yield* ballast(ctx, "celld", "fill", 9);
-    yield* settled(ctx, nodes);
-
-    // One paused lease stops every move in the fleet, so the pause is issued
-    // on a node that is about to become the most overloaded one.
+    // The pause is issued on celld2 and the overload is built on celld: one
+    // paused lease is documented to stop every move in the fleet, not only the
+    // moves of the node that published it.
     const pauseBody = yield* operator(
       ctx,
       "rebalance-pause",
@@ -337,12 +364,16 @@ const rebalanceControl = (ctx: QualificationContext) =>
       Boolean(lease.load?.rebalance_paused),
     );
 
-    yield* ballast(ctx, "celld2", "extra", 12);
+    const members = yield* cells(ctx, 3);
+    yield* Effect.forEach(members, (member) =>
+      member.writeAcknowledged("celld"),
+    );
+    yield* ballast(ctx, "celld", "fill", 21);
     const during = yield* nodeStates(ctx, nodes);
     // Without an imbalance the fleet has nothing to move and a pause proves
     // nothing, so the overload is required before the window is observed.
     yield* equal(
-      overTarget(WEIGHTS, ownedCells(during)).includes("celld2"),
+      overTarget(WEIGHTS, ownedCells(during)).includes("celld"),
       true,
     );
     const before = yield* fleet.ownership();
@@ -374,7 +405,7 @@ const rebalanceControl = (ctx: QualificationContext) =>
     const live: readonly Node[] = ["celld", "celld2"];
     const staleBefore = yield* fleet.ownership();
     yield* fleet.pause("celld3");
-    yield* ballast(ctx, "celld2", "extra", 12);
+    yield* ballast(ctx, "celld2", "stale", 9);
     const moved = yield* ctx.poll(nodeStates(ctx, live), (states) =>
       live.some((node) => states[node].rebalanced > converged[node].rebalanced),
     );
@@ -456,9 +487,9 @@ const gracefulDrain = (ctx: QualificationContext) =>
     Effect.gen(function* () {
       const { fleet, nodes, artifacts } = ctx;
       const donor: Node = "celld2";
-      const members = yield* cells(ctx, 3);
       // Activation places a new cell on the node that receives its first
       // request, so every evidence cell starts on the node about to drain.
+      const members = yield* cells(ctx, 3, () => donor);
       yield* Effect.forEach(members, (member) =>
         member.writeAcknowledged(donor),
       );
@@ -532,10 +563,9 @@ const gracefulDrain = (ctx: QualificationContext) =>
       yield* checkReadinessOrder(donor, samples);
 
       const after = yield* fleet.ownership();
-      yield* checkDrainedAway(donor, before, after);
       const evidence = parseDrainLog(yield* fleet.logs(donor));
-      yield* checkHandoffEvidence(donor, evidence, drained);
-
+      // Written before the oracles run, so a failing drain still leaves its
+      // readiness, ownership and handoff evidence behind.
       yield* artifacts.json("graceful-drain.json", {
         donor,
         refusedWith: refused,
@@ -546,6 +576,8 @@ const gracefulDrain = (ctx: QualificationContext) =>
         ownersAfter: ownersOf(after, members),
         evidence,
       });
+      yield* checkDrainedAway(donor, before, after);
+      yield* checkHandoffEvidence(donor, evidence, drained.map(scope));
 
       yield* ctx.start(donor);
       yield* refresh(ctx, members, donor);
@@ -568,7 +600,12 @@ const concurrentDrain = (ctx: QualificationContext) =>
     const { fleet, nodes, artifacts } = ctx;
     const donors: readonly Node[] = ["celld2", "celld3"];
     const survivor: Node = "celld";
-    const members = yield* cells(ctx, 4);
+    // Two cells start on each donor, so both drains have something to hand off.
+    const members = yield* cells(
+      ctx,
+      4,
+      (index) => donors[index % donors.length]!,
+    );
     for (const [index, member] of members.entries())
       yield* member.writeAcknowledged(donors[index % donors.length]!);
     const before = yield* fleet.ownership();
@@ -625,7 +662,7 @@ const concurrentDrain = (ctx: QualificationContext) =>
           yield* checkHandoffEvidence(
             donor.node,
             donor.evidence,
-            held.filter((cell) => before[cell]!.node === donor.node),
+            held.filter((cell) => before[cell]!.node === donor.node).map(scope),
           );
         const after = yield* fleet.ownership();
         for (const node of donors) yield* checkDrainedAway(node, before, after);
@@ -663,7 +700,7 @@ const preserveReload = (ctx: QualificationContext) =>
   Effect.gen(function* () {
     const { fleet, nodes, artifacts } = ctx;
     const node: Node = "celld3";
-    const members = yield* cells(ctx, 3);
+    const members = yield* cells(ctx, 3, () => node);
     yield* Effect.forEach(members, (member) => member.writeAcknowledged(node));
     const before = yield* fleet.ownership();
     const preserved = members
@@ -743,7 +780,8 @@ const binaryUpgrade = (ctx: QualificationContext) =>
       started,
     );
 
-    const members = yield* cells(ctx, 3);
+    // One cell per node, so the upgrade moves an owned cell at every step.
+    const members = yield* cells(ctx, 3, (index) => nodes[index % 3]!);
     for (const [index, member] of members.entries())
       yield* member.writeAcknowledged(nodes[index % nodes.length]!);
     const before = yield* fleet.ownership();
