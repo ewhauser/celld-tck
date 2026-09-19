@@ -1,6 +1,6 @@
 # Full local qualification
 
-This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 34 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, `test:capacity`, and `test:security` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
+This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 38 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, `test:capacity`, and `test:security` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
 
 All authored TypeScript uses Effect v4 RC.115. New runtime fixtures use the same compatibility date as the API corpus. Fault scenarios assert lifecycle invariants against real celld; they are not labeled as differential workerd tests.
 
@@ -33,7 +33,16 @@ Named service RPC is covered by the API corpus and checked again after each node
 
 ## Storage and lifecycle faults
 
-Two [in-place deployment cases](IN-PLACE-DEPLOYMENT.md) verify explicit reload adoption and rejected replacement code without process restarts.
+Six [in-place deployment cases](IN-PLACE-DEPLOYMENT.md) verify reload adoption and its lifecycle transitions without process restarts.
+
+- `faults.reload-adoption`: explicit reload adopts a valid second revision on every node.
+- `faults.reload-invalid`: a replacement that fails initialization leaves the previous deployment serving.
+- `faults.reload-in-flight`: adopt while a six-second request, an armed alarm, and an outstanding `storage.sync()` barrier are open on the resident object, then issue nine more acknowledged writes. Require immediate node-level adoption, the resident object to stay on the previous generation until its safe point, the request, alarm, and barrier to finish on the previous revision, and no lost acknowledged write.
+- `faults.reload-socket`: adopt at an unobstructed safe point with an open hibernatable WebSocket. Require the same socket to stay open, continue its serialized attachment, report the new revision with a changed activation token, and keep its durable rows.
+- `faults.reload-forced`: hold a safe point open with a regular WebSocket past a twenty-second `CELLD_DEPLOY_MAX_AGE_S` set by a scenario overlay. Require close code 1012 no earlier than the deadline, an untouched hibernatable socket, and a reconnecting client that reaches the new revision.
+- `faults.reload-module-bytes`: rewrite a published module in the bucket at its original length and require all three nodes to refuse the reload with a digest mismatch naming the module, while the previous revision keeps serving.
+
+The lifecycle cases verify the documented safe-point, adoption-deadline, preservation, and module-verification contracts of celld v0.5.0. The [linked document](IN-PLACE-DEPLOYMENT.md) records the inventory those assertions rest on.
 
 Eight [storage durability cases](STORAGE-DURABILITY.md) cover explicit sync barriers, cursor output restrictions, and transaction/gate deadlines. They run in this group alongside the cases below.
 
