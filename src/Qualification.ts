@@ -15,8 +15,10 @@ import { trafficCases } from "./QualificationTraffic.js";
 import { dependencyCases } from "./QualificationDependencies.js";
 import { faultCases } from "./QualificationFaults.js";
 import { capacityCases } from "./QualificationCapacity.js";
+import { securityCases } from "./QualificationSecurity.js";
 interface QualificationCase {
   readonly manualReload: boolean;
+  readonly security: boolean;
   readonly id: string;
   readonly durability: "bucket" | "fleet";
   readonly run: (
@@ -32,8 +34,10 @@ export const qualificationCases = [
   ...dependencyCases,
   ...faultCases,
   ...capacityCases,
+  ...securityCases,
 ].map((test) => ({
   manualReload: false,
+  security: false,
   durability: "fleet" as const,
   ...test,
 })) satisfies readonly QualificationCase[];
@@ -97,6 +101,7 @@ export const runQualification = (options: {
                 durability: scenario.durability,
                 nodeCount: 3,
                 qualification: true,
+                security: scenario.security,
                 manualReload: scenario.manualReload,
               });
               environment.candidates.push(runtime.metadata);
