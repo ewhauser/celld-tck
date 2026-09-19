@@ -37,12 +37,14 @@ Completion requires assertions about stored values and externally observable eff
 
 - [x] Adopt a new application revision through `/reload` without restarting nodes.
 - [x] Verify that invalid replacement code leaves the previous deployment serving.
-- [ ] Exercise deployment adoption with in-flight requests, alarms, and pending durability work.
-- [ ] Verify storage and hibernatable WebSocket preservation at a safe-point transition.
-- [ ] Test forced adoption after the configured deadline, including regular WebSocket closure and client reconnection.
-- [ ] Reject modified module bytes that do not match the deployment manifest.
+- [x] Exercise deployment adoption with in-flight requests, alarms, and pending durability work.
+- [x] Verify storage and hibernatable WebSocket preservation at a safe-point transition.
+- [x] Test forced adoption after the configured deadline, including regular WebSocket closure and client reconnection.
+- [x] Reject modified module bytes that do not match the deployment manifest.
 
-The first two items are covered by `faults.reload-adoption` and `faults.reload-invalid`; see [IN-PLACE-DEPLOYMENT.md](IN-PLACE-DEPLOYMENT.md) for the local evidence and limits.
+The six items are covered by `faults.reload-adoption`, `faults.reload-invalid`, `faults.reload-in-flight`, `faults.reload-socket`, `faults.reload-forced`, and `faults.reload-module-bytes`; see [IN-PLACE-DEPLOYMENT.md](IN-PLACE-DEPLOYMENT.md) for the v0.5.0 inventory, the local evidence, and the limits.
+
+Every contract this section names is documented and observable on the pinned v0.5.0 binary, so nothing here is recorded as untestable. Three adjacent behaviors remain open and are not claimed: cross-deployment Durable Object calls during the drain window, rebalancing during an in-progress adoption, and `CELLD_DEPLOY_MAX_AGE_S=0`, which forces every resident object at the adoption instead of after a deadline.
 
 Record the revision that handled each request and validate retained state. This extends the current rolling application-deployment case; it does not establish binary-upgrade compatibility.
 

@@ -5,7 +5,7 @@ import {
   type WorkflowEvent,
   type WorkflowStep,
 } from "cloudflare:workers";
-import { Effect, Schema } from "effect";
+import { Duration, Effect, Schema } from "effect";
 import { durabilityOperation } from "./Durability.js";
 import { platform, ready } from "../shared/Platform.js";
 const blob = (id: number) => {
@@ -47,6 +47,7 @@ export class Recovery extends DurableObject<QualificationEnv> {
           JSON.stringify({
             counter: attachment.counter,
             activation: this.activation,
+            revision: "qualification-v1",
             message: String(message),
           }),
         );
@@ -55,6 +56,25 @@ export class Recovery extends DurableObject<QualificationEnv> {
   }
   webSocketClose(socket: WebSocket, code: number, reason: string) {
     socket.close(code, reason);
+  }
+  // Observation only: the driver decides which deployment may run an alarm.
+  alarm() {
+    return Effect.runPromise(
+      Effect.gen({ self: this }, function* () {
+        const storage = this.ctx.storage;
+        const holdMs = storage.kv.get<number>("alarm:hold") ?? 0;
+        if (holdMs > 0) yield* Effect.sleep(Duration.millis(holdMs));
+        storage.transactionSync(() => {
+          storage.kv.put(
+            "alarm:count",
+            (storage.kv.get<number>("alarm:count") ?? 0) + 1,
+          );
+          storage.kv.put("alarm:revision", "qualification-v1");
+          storage.kv.put("alarm:activation", this.activation);
+          storage.kv.put("alarm:at", Date.now());
+        });
+      }),
+    );
   }
   fetch(request: Request) {
     return Effect.runPromise(
@@ -89,6 +109,67 @@ export class Recovery extends DurableObject<QualificationEnv> {
           server!.serializeAttachment({ counter: 0 });
           return new Response(null, { status: 101, webSocket: client! });
         }
+        // A regular (non-hibernatable) socket: the documented safe-point blocker.
+        if (url.pathname === "/socket/regular") {
+          const [client, server] = Object.values(new WebSocketPair());
+          server!.accept();
+          let counter = 0;
+          server!.addEventListener("message", (event) => {
+            counter++;
+            server!.send(
+              JSON.stringify({
+                counter,
+                activation: this.activation,
+                revision: "qualification-v1",
+                message: String(event.data),
+              }),
+            );
+          });
+          return new Response(null, { status: 101, webSocket: client! });
+        }
+        // Holds one request open in the object for a bounded time.
+        if (url.pathname === "/hold") {
+          const ms = Number(url.searchParams.get("ms") ?? 0);
+          if (!Number.isInteger(ms) || ms < 0 || ms > 120000)
+            return new Response("invalid hold", { status: 400 });
+          const started = Date.now();
+          yield* Effect.sleep(Duration.millis(ms));
+          return Response.json({
+            revision: "qualification-v1",
+            activation: this.activation,
+            requestedMs: ms,
+            heldMs: Date.now() - started,
+          });
+        }
+        if (url.pathname === "/alarm/arm") {
+          const ms = Number(url.searchParams.get("ms") ?? 0);
+          const hold = Number(url.searchParams.get("hold") ?? 0);
+          if (
+            !Number.isInteger(ms) ||
+            ms < 0 ||
+            ms > 120000 ||
+            !Number.isInteger(hold) ||
+            hold < 0 ||
+            hold > 60000
+          )
+            return new Response("invalid alarm", { status: 400 });
+          storage.kv.put("alarm:hold", hold);
+          const at = Date.now() + ms;
+          yield* platform(() => storage.setAlarm(at));
+          return Response.json({
+            armed: true,
+            at,
+            revision: "qualification-v1",
+          });
+        }
+        if (url.pathname === "/alarm/state")
+          return Response.json({
+            count: storage.kv.get<number>("alarm:count") ?? 0,
+            revision: storage.kv.get<string>("alarm:revision") ?? null,
+            activation: storage.kv.get<string>("alarm:activation") ?? null,
+            at: storage.kv.get<number>("alarm:at") ?? null,
+            pending: yield* platform(() => storage.getAlarm()),
+          });
         if (url.pathname.startsWith("/history/") || url.pathname === "/stream")
           storage.sql.exec(
             "CREATE TABLE IF NOT EXISTS history (seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL, payload TEXT NOT NULL)",

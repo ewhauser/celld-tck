@@ -18,6 +18,7 @@ import { capacityCases } from "./QualificationCapacity.js";
 import { securityCases } from "./QualificationSecurity.js";
 interface QualificationCase {
   readonly manualReload: boolean;
+  readonly adoptionDeadline: boolean;
   readonly security: boolean;
   readonly id: string;
   readonly durability: "bucket" | "fleet";
@@ -37,6 +38,7 @@ export const qualificationCases = [
   ...securityCases,
 ].map((test) => ({
   manualReload: false,
+  adoptionDeadline: false,
   security: false,
   durability: "fleet" as const,
   ...test,
@@ -103,6 +105,7 @@ export const runQualification = (options: {
                 qualification: true,
                 security: scenario.security,
                 manualReload: scenario.manualReload,
+                adoptionDeadline: scenario.adoptionDeadline,
               });
               environment.candidates.push(runtime.metadata);
               const ctx = yield* makeContext(
