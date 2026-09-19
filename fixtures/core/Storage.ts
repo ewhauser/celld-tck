@@ -133,6 +133,20 @@ export const storageOperation = (storage: DurableObjectStorage, path: string) =>
           remaining: [...(yield* platform(() => storage.list()))],
         };
       }
+      case "/flags/delete-all-alarm": {
+        // delete_all_deletes_alarm (default from 2026-02-24) against its
+        // delete_all_preserves_alarm counterpart: the stored values go either
+        // way, only a pending alarm's survival differs between the variants.
+        yield* platform(() => storage.put({ a: 1, b: "" }));
+        yield* platform(() => storage.setAlarm(Date.now() + 3600000));
+        yield* platform(() => storage.deleteAll());
+        const alarm = yield* platform(() => storage.getAlarm());
+        yield* platform(() => storage.deleteAlarm());
+        return {
+          values: [...(yield* platform(() => storage.list()))],
+          alarmPresent: alarm !== null,
+        };
+      }
       case "/storage/delete-all": {
         yield* platform(() => storage.put({ a: 1, b: "" }));
         yield* platform(() => storage.setAlarm(Date.now() + 3600000));

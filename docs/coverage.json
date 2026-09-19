@@ -99,34 +99,44 @@
     },
     {
       "family": "websocket",
-      "cases": ["websocket.protocol-attachment"]
+      "cases": [
+        "websocket.protocol-attachment",
+        "websocket.outbound-close",
+        "websocket.concurrent-sockets"
+      ]
+    },
+    {
+      "family": "flags",
+      "cases": ["flags.enabled-defaults", "flags.disabled-counterparts"]
     },
     {
       "family": "kv",
-      "cases": ["kv.metadata-list", "kv.binary-pagination"]
+      "cases": ["kv.metadata-list", "kv.binary-pagination", "kv.expiration"]
     },
     {
       "family": "d1",
-      "cases": ["d1.bindings-results", "d1.batch-rollback"]
+      "cases": ["d1.bindings-results", "d1.batch-rollback", "d1.exec-batch"]
     },
     {
       "family": "r2",
       "cases": [
         "r2.metadata-range-delete",
         "r2.conditional-write",
-        "r2.multipart"
+        "r2.multipart",
+        "r2.list-options"
       ]
     },
     {
       "family": "queues",
-      "cases": ["queues.batch-ack-retry"]
+      "cases": ["queues.batch-ack-retry", "queues.retry-delay"]
     },
     {
       "family": "workflows",
       "cases": [
         "workflows.steps-sleep-result",
         "workflows.retry",
-        "workflows.event"
+        "workflows.event",
+        "workflows.timeout"
       ]
     },
     {

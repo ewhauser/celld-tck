@@ -41,7 +41,12 @@ const inputFor = (
   seed: corpus.seed,
   namespace: "oracle-mutations",
   compatibilityDate: corpus.compatibilityDate,
-  compatibilityFlags: test.fixture === "node" ? ["nodejs_compat"] : [],
+  compatibilityFlags:
+    test.fixture === "node"
+      ? ["nodejs_compat"]
+      : test.fixture === "flags"
+        ? ["delete_all_preserves_alarm", "no_websocket_standard_binary_type"]
+        : [],
 });
 // Replace only acquisition of observations. These are the actual registered
 // check/compare/divergence functions, including independent semantic invariants.

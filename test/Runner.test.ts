@@ -52,8 +52,17 @@ it.effect(
         string,
         Record<string, unknown>
       >;
-      expect(Object.keys(fixtures)).toEqual(["core", "node", "extensions"]);
+      expect(Object.keys(fixtures)).toEqual([
+        "core",
+        "node",
+        "flags",
+        "extensions",
+      ]);
       expect(fixtures.node?.compatibilityFlags).toEqual(["nodejs_compat"]);
+      expect(fixtures.flags?.compatibilityFlags).toEqual([
+        "delete_all_preserves_alarm",
+        "no_websocket_standard_binary_type",
+      ]);
       expect(fixtures.core?.compatibilityFlags).toEqual([]);
       for (const fixture of Object.values(fixtures)) {
         expect(fixture.fixtureSha256).toMatch(/^[a-f0-9]{64}$/);

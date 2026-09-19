@@ -107,7 +107,11 @@ export const dependencyCases = [
   })),
   { id: "dependencies.workflow-recovery" as const, run: runWorkflow },
   ...(
-    ["dependencies.stream-reconnect", "dependencies.hibernation"] as const
+    [
+      "dependencies.stream-reconnect",
+      "dependencies.hibernation",
+      "dependencies.socket-failover",
+    ] as const
   ).map((id) => ({
     id,
     run: (ctx: QualificationContext) => runSocketOrStream(id, ctx),

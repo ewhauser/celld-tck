@@ -37,6 +37,29 @@ export class TestWorkflow extends WorkflowEntrypoint<
           );
           return { attempts };
         }
+        if (event.payload.mode === "timeout") {
+          // A waitForEvent deadline must expire as a step failure the workflow
+          // can observe, and the instance must keep running afterwards.
+          const timedOut = yield* rejection(
+            platform(() =>
+              step.waitForEvent("absent", {
+                type: "never",
+                timeout: "3 seconds",
+              }),
+            ),
+          );
+          yield* platform(() =>
+            step.sleepUntil("resume", new Date(Date.now() + 1000)),
+          );
+          return {
+            timedOut,
+            after: yield* platform(() =>
+              step.do("after", () =>
+                Effect.runPromise(Effect.succeed(event.payload.value + 5)),
+              ),
+            ),
+          };
+        }
         if (event.payload.mode === "event") {
           const received = yield* platform(() =>
             step.waitForEvent<{ value: string }>("receive", {
@@ -65,6 +88,9 @@ export const QueueBody = Schema.Struct({
   namespace: Schema.String,
   key: Schema.String,
   retry: Schema.Boolean,
+  /** Record one entry per attempt with its arrival time and message identity. */
+  stamp: Schema.optionalKey(Schema.Boolean),
+  delaySeconds: Schema.optionalKey(Schema.Int),
 });
 export const consume = (batch: MessageBatch<unknown>, env: Env) =>
   Effect.runPromise(
@@ -72,19 +98,25 @@ export const consume = (batch: MessageBatch<unknown>, env: Env) =>
       for (const message of batch.messages) {
         const body = yield* Schema.decodeUnknownEffect(QueueBody)(message.body);
         const stub = env.PROBE.getByName(body.namespace);
+        const key = body.stamp ? `${body.key}:${message.attempts}` : body.key;
         yield* platform(() =>
           stub.fetch(
-            new Request(`https://fixture.test/storage/put?key=${body.key}`, {
+            new Request(`https://fixture.test/storage/put?key=${key}`, {
               method: "POST",
-              body: JSON.stringify({
-                attempts: message.attempts,
-                retry: body.retry,
-              }),
+              body: JSON.stringify(
+                body.stamp
+                  ? {
+                      attempts: message.attempts,
+                      at: Date.now(),
+                      id: message.id,
+                    }
+                  : { attempts: message.attempts, retry: body.retry },
+              ),
             }),
           ),
         );
         if (body.retry && message.attempts === 1)
-          message.retry({ delaySeconds: 0 });
+          message.retry({ delaySeconds: body.delaySeconds ?? 0 });
         else message.ack();
       }
     }),
@@ -278,6 +310,18 @@ export const services = (request: Request, env: Env, name: string) =>
           value: get ? yield* platform(() => get.text()) : null,
           aborted: yield* platform(() => env.BUCKET.head(name + "-abort")),
         };
+      }
+      case "/queues/retry-delay": {
+        yield* platform(() =>
+          env.QUEUE.send({
+            namespace: name,
+            key: "delayed",
+            retry: true,
+            stamp: true,
+            delaySeconds: 3,
+          }),
+        );
+        return { sent: true };
       }
       case "/queues/start": {
         yield* platform(() =>

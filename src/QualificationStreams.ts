@@ -1,7 +1,8 @@
-import { Deferred, Effect, Exit, Fiber, Schema } from "effect";
-import { TckError } from "./Domain.js";
+import { Deferred, Effect, Exit, Fiber, Schedule, Schema } from "effect";
+import { leaseLapse, TckError } from "./Domain.js";
 import { decodeAs } from "./Artifacts.js";
 import { equal } from "./Oracle.js";
+import { checkSocketFailover } from "./QualificationOracles.js";
 import type { QualificationContext } from "./QualificationContext.js";
 const platform = <A>(f: (signal: AbortSignal) => PromiseLike<A>) =>
   Effect.tryPromise({
@@ -161,6 +162,119 @@ export const runSocketOrStream = (id: string, ctx: QualificationContext) =>
           after,
           remainedConnected: socket.readyState === WebSocket.OPEN,
         };
+      }
+      if (id === "dependencies.socket-failover") {
+        // celld documents that a WebSocket transport cannot follow a cell to a
+        // new owner: hold several sockets open, take the owner down, and prove
+        // both the forced close and a working reconnection on the same name.
+        const socketUrl = () =>
+          `${ctx.targets.celld.baseUrl.replace("http:", "ws:")}/socket?name=${ctx.name}`;
+        interface Held {
+          readonly socket: WebSocket;
+          readonly state: {
+            received: number;
+            receivedAfterKill: number;
+            closed: boolean;
+            clean: boolean;
+            code: number;
+            killed: boolean;
+            last: string | null;
+          };
+        }
+        const hold = Effect.gen(function* () {
+          const socket = yield* Effect.acquireRelease(
+            Effect.sync(() => new WebSocket(socketUrl())),
+            (socket) => Effect.sync(() => socket.close()),
+          );
+          const state: Held["state"] = {
+            received: 0,
+            receivedAfterKill: 0,
+            closed: false,
+            clean: false,
+            code: 0,
+            killed: false,
+            last: null,
+          };
+          socket.addEventListener("message", (event: MessageEvent) => {
+            state.received++;
+            state.last = String(event.data);
+            if (state.killed) state.receivedAfterKill++;
+          });
+          socket.addEventListener("close", (event: CloseEvent) => {
+            state.closed = true;
+            state.clean = event.wasClean;
+            state.code = event.code;
+          });
+          yield* Effect.callback<void, TckError>((resume) => {
+            socket.onopen = () => resume(Effect.void);
+            socket.onerror = () =>
+              resume(
+                Effect.fail(
+                  new TckError({
+                    phase: "websocket",
+                    message: "Connection failed",
+                  }),
+                ),
+              );
+          }).pipe(Effect.timeout("10 seconds"));
+          return { socket, state } satisfies Held;
+        });
+        const probe = (held: Held) =>
+          Effect.gen(function* () {
+            const before = held.state.received;
+            yield* Effect.sync(() => held.socket.send("probe"));
+            yield* ctx.poll(
+              Effect.sync(() => held.state.received > before),
+              (done) => done,
+            );
+            return yield* Schema.decodeUnknownEffect(
+              Schema.fromJsonString(
+                Schema.Struct({
+                  counter: Schema.Int,
+                  activation: Schema.String,
+                  message: Schema.String,
+                }),
+              ),
+            )(held.state.last ?? "");
+          });
+        for (let i = 0; i < 8; i++) yield* ctx.writeAcknowledged();
+        const held = yield* Effect.forEach([0, 1, 2], () => hold, {
+          concurrency: "unbounded",
+        });
+        for (const socket of held)
+          yield* equal((yield* probe(socket)).counter, 1);
+        const owner = (yield* ctx.owner()).node;
+        for (const socket of held)
+          yield* Effect.sync(() => {
+            socket.state.killed = true;
+          });
+        yield* ctx.fleet.kill(owner);
+        yield* ctx.poll(
+          Effect.sync(() => held.every((socket) => socket.state.closed)),
+          (done) => done,
+        );
+        yield* leaseLapse;
+        yield* ctx.start(owner);
+        const reconnected = yield* hold.pipe(
+          Effect.retry({ schedule: Schedule.spaced("1 second"), times: 20 }),
+        );
+        const resumed = yield* probe(reconnected);
+        const observation = {
+          sockets: held.map((socket) => ({
+            received: socket.state.received,
+            receivedAfterKill: socket.state.receivedAfterKill,
+            closed: socket.state.closed,
+            clean: socket.state.clean,
+            code: socket.state.code,
+          })),
+          beforeActivation: ctx.identity.activation,
+          afterActivation: resumed.activation,
+          reconnectCounter: resumed.counter,
+        };
+        yield* ctx.artifacts.json("socket-failover.json", observation);
+        yield* checkSocketFailover(observation);
+        yield* ctx.verify();
+        return observation;
       }
       yield* equal(
         id === "dependencies.stream-reconnect" ||
