@@ -194,6 +194,10 @@ const knownBugMutations: Record<string, Mutation> = {
     name: "a conforming timer result breaks alongside the known bug",
     changes: [{ path: ["body", "race"], value: "slow" }],
   },
+  "flags.enabled-defaults": {
+    name: "the still-honored deleteAll switch breaks alongside the known bug",
+    changes: [{ path: ["body", "deleteAll", "alarmPresent"], value: true }],
+  },
   "repro.body-readers": {
     name: "fresh body is already marked used",
     changes: [{ path: ["body", 0, "before"], value: true }],
