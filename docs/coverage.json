@@ -202,7 +202,7 @@
     },
     {
       "family": "Cron, TCP/TLS, and managed Cloudflare service guarantees",
-      "reason": "Require a clock-controlled or externally reachable reference environment; not established by Miniflare API emulation."
+      "reason": "Require a clock-controlled or externally reachable reference environment; not established by Miniflare API emulation. Miniflare has no scheduler and celld v0.5.0 exposes no scheduled trigger, so cron has no shared triggering mechanism; TLS certificate validation needs a publicly trusted certificate neither runtime can be given locally. See RUNTIME-BREADTH.md."
     },
     {
       "family": "PITR",

@@ -186,6 +186,7 @@ pnpm tck --profile local --suite all
 pnpm tck --profile reference --suite all
 pnpm tck --profile local --suite bindings
 pnpm tck --profile local --suite node
+pnpm tck --profile local --suite flags
 pnpm tck --profile local --suite extensions
 pnpm tck --profile local --case storage.transaction-rollback --seed 42
 ```
