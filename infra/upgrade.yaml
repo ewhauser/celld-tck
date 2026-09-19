@@ -1,0 +1,35 @@
+# Binary-upgrade overlay, layered after infra/operations.yaml.
+#
+# infra/compose.yaml pins one celld image for the whole fleet. This overlay
+# indirects each node's image through its own variable so one run can start a
+# fleet on an explicitly pinned older release and then replace one node at a
+# time with the pinned current release, which is what a rolling binary upgrade
+# is. The `tool` service is not indirected: the deployment is written once, by
+# the release the rest of the suite pins.
+#
+# Both defaults are the pinned v0.5.0 digest, so selecting this overlay without
+# setting the variables changes nothing.
+#
+# The stop bound goes back to celld's own default of 40 seconds for the whole
+# run. v0.4.1 still has CELLD_DRAIN_TOKEN_WAIT_MS, whose default of 30000 it
+# validates against the total bound, so a v0.4.1 node refuses to start under
+# the 20-second bound infra/operations.yaml otherwise pins:
+#
+#   Error: CELLD_DRAIN_TOKEN_WAIT_MS must be at most 3/4 of
+#   CELLD_SHUTDOWN_TOTAL_MS; maximum is 15000 for 20000, not 30000
+#
+# Setting the removed variable instead is not an option: v0.5.0 rejects it at
+# startup, and one fleet has to run both releases.
+services:
+  celld:
+    image: "${TCK_IMAGE_CELLD:-ghcr.io/denoland/celld:v0.5.0@sha256:df8e74bb9a059df5779644368984933eba76acd6a2d196672732f4368f760fc8}"
+    environment:
+      CELLD_SHUTDOWN_TOTAL_MS: "40000"
+  celld2:
+    image: "${TCK_IMAGE_CELLD2:-ghcr.io/denoland/celld:v0.5.0@sha256:df8e74bb9a059df5779644368984933eba76acd6a2d196672732f4368f760fc8}"
+    environment:
+      CELLD_SHUTDOWN_TOTAL_MS: "40000"
+  celld3:
+    image: "${TCK_IMAGE_CELLD3:-ghcr.io/denoland/celld:v0.5.0@sha256:df8e74bb9a059df5779644368984933eba76acd6a2d196672732f4368f760fc8}"
+    environment:
+      CELLD_SHUTDOWN_TOTAL_MS: "40000"

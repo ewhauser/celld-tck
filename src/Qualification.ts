@@ -17,11 +17,16 @@ import { faultCases } from "./QualificationFaults.js";
 import { capacityCases } from "./QualificationCapacity.js";
 import { securityCases } from "./QualificationSecurity.js";
 import { telemetryCases } from "./QualificationTelemetry.js";
+import { operationsCases } from "./QualificationOperations.js";
 interface QualificationCase {
   readonly manualReload: boolean;
   readonly adoptionDeadline: boolean;
   readonly security: boolean;
   readonly telemetry: TelemetryMode | undefined;
+  readonly operations: boolean;
+  readonly balancing: boolean;
+  readonly upgrade: boolean;
+  readonly images: Readonly<Record<string, string>>;
   readonly id: string;
   readonly durability: "bucket" | "fleet";
   readonly run: (
@@ -39,11 +44,16 @@ export const qualificationCases = [
   ...capacityCases,
   ...securityCases,
   ...telemetryCases,
+  ...operationsCases,
 ].map((test) => ({
   manualReload: false,
   adoptionDeadline: false,
   security: false,
   telemetry: undefined,
+  operations: false,
+  balancing: false,
+  upgrade: false,
+  images: {},
   durability: "fleet" as const,
   ...test,
 })) satisfies readonly QualificationCase[];
@@ -109,6 +119,10 @@ export const runQualification = (options: {
                 qualification: true,
                 security: scenario.security,
                 telemetry: scenario.telemetry,
+                operations: scenario.operations,
+                balancing: scenario.balancing,
+                upgrade: scenario.upgrade,
+                images: scenario.images,
                 manualReload: scenario.manualReload,
                 adoptionDeadline: scenario.adoptionDeadline,
               });

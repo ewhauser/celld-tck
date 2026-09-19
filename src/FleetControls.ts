@@ -11,6 +11,29 @@ import { inspectService, mcCat, publishedPort } from "./Compose.js";
 export const Node = Schema.Literals(["celld", "celld2", "celld3"]);
 export type Node = typeof Node.Type;
 export const Owner = Schema.Struct({ node: Node, epoch: Schema.Int });
+/**
+ * An ownership record as it can actually be observed mid-operation: a released
+ * cell keeps its record with an empty node until a successor acquires it, so a
+ * drain or a rebalance can be sampled without a decode failure.
+ */
+export const OwnerRecord = Schema.Struct({
+  node: Schema.String,
+  epoch: Schema.Int,
+});
+export type OwnerRecord = typeof OwnerRecord.Type;
+/**
+ * The load block a node publishes in its lease and repeats in `/state`, as far
+ * as the fleet-operations cases read it. celld publishes more fields; decoding
+ * only these keeps the schema from breaking on an unrelated addition.
+ */
+export const NodeLoad = Schema.Struct({
+  sampled_ms: Schema.Int,
+  owned_cells: Schema.Int,
+  placement_weight: Schema.Int,
+  rebalance_paused: Schema.Boolean,
+  draining: Schema.Boolean,
+});
+export type NodeLoad = typeof NodeLoad.Type;
 export const fleetControls = (
   compose: (
     args: readonly string[],
@@ -31,7 +54,11 @@ export const fleetControls = (
           Schema.Array(
             Schema.Struct({
               Id: Schema.String,
+              // The resolved image ID and the configured reference: a binary
+              // upgrade has to prove which image a node is actually running.
+              Image: Schema.String,
               Config: Schema.Struct({
+                Image: Schema.String,
                 Labels: Schema.Record(Schema.String, Schema.String),
               }),
               State: Schema.Struct({
@@ -121,6 +148,7 @@ export const fleetControls = (
           return yield* decodeJson(
             Schema.Struct({
               probe_public_key: Schema.String,
+              load: Schema.optionalKey(NodeLoad),
               log: Schema.optionalKey(
                 Schema.Struct({
                   state: Schema.String,
@@ -260,6 +288,44 @@ export const fleetControls = (
       inspect,
       fenced,
       target,
+      /**
+       * Every ordinary-object ownership record in the fleet bucket, keyed by
+       * cell identity. One throwaway container reads the whole set: a fleet
+       * operation has to snapshot ownership repeatedly, and one `mc cat` per
+       * cell would cost more than the operation under test.
+       */
+      ownership: () =>
+        Effect.gen(function* () {
+          const output = yield* compose([
+            "run",
+            "--rm",
+            "-T",
+            "--entrypoint",
+            "/bin/sh",
+            "storage",
+            "-ec",
+            'mc find local/tck/cells --name own.json | while read -r path; do printf "%s\t" "$path"; mc cat "$path"; printf "\n"; done',
+          ]);
+          yield* artifacts.text(`ownership-${++sequence}.tsv`, output.stdout);
+          const records: Record<string, OwnerRecord> = {};
+          for (const line of output.stdout.split("\n")) {
+            if (!line.trim()) continue;
+            const separator = line.indexOf("\t");
+            const path = line.slice(0, separator);
+            const cell =
+              /^local\/tck\/cells\/Recovery:([a-f0-9]{64})\/own\.json$/.exec(
+                path,
+              )?.[1];
+            // A reserved runtime class also has an ownership record; only the
+            // ordinary-object cells this harness creates are addressable here.
+            if (!cell) continue;
+            records[cell] = yield* decodeJson(
+              OwnerRecord,
+              line.slice(separator + 1),
+            );
+          }
+          return records as Readonly<Record<string, OwnerRecord>>;
+        }),
       owner: (cell: string) =>
         Effect.gen(function* () {
           if (!/^[a-f0-9]{64}$/.test(cell))
@@ -275,6 +341,35 @@ export const fleetControls = (
           )).stdout;
           yield* artifacts.text(`owner-${++sequence}.json`, raw);
           return yield* decodeJson(Owner, raw);
+        }),
+      /**
+       * The same record, tolerating the empty node a released cell carries
+       * between its donor's release and its successor's acquire.
+       */
+      ownerRecord: (cell: string) =>
+        Effect.gen(function* () {
+          if (!/^[a-f0-9]{64}$/.test(cell))
+            return yield* Effect.fail(
+              new TckError({
+                phase: "fleet",
+                message: "Invalid cell identity",
+              }),
+            );
+          const raw = (yield* mcCat(
+            compose,
+            `local/tck/cells/Recovery:${cell}/own.json`,
+          )).stdout;
+          yield* artifacts.text(`owner-record-${++sequence}.json`, raw);
+          return yield* decodeJson(OwnerRecord, raw);
+        }),
+      /**
+       * Starts or replaces one node's container without touching its peers, so
+       * a re-pinned image is adopted the way a rolling update adopts it.
+       */
+      recreate: (node: Node) =>
+        Effect.gen(function* () {
+          yield* compose(["up", "-d", "--no-deps", node]);
+          return yield* target(node);
         }),
       kill: (node: Node) =>
         Effect.gen(function* () {

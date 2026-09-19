@@ -50,7 +50,11 @@ export interface ProbeResult {
   readonly error?: string;
 }
 
-const clamp = (value: string) => value.slice(0, 4096);
+// Large enough for the operator listener's `/state`, whose cell inventory
+// grows with the fleet, and still bounded so a runaway body cannot be carried
+// back through the probe's stdout.
+const BODY_LIMIT = 1024 * 1024;
+const clamp = (value: string) => value.slice(0, BODY_LIMIT);
 
 /** Decodes a chunked transfer body; returns undefined until the final chunk arrives. */
 const dechunk = (raw: string): string | undefined => {

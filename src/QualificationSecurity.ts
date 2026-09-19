@@ -14,11 +14,11 @@ import { equal } from "./Oracle.js";
 import {
   acknowledgedBatch,
   events,
+  sidecarProbe,
   type QualificationContext,
 } from "./QualificationContext.js";
 import type { Probe } from "./SecurityProbe.js";
 import {
-  ProbeResult,
   checkAllowed,
   checkApplicationFallthrough,
   checkBodyLimit,
@@ -49,40 +49,6 @@ const State = Schema.Struct({
     cells: Schema.Record(Schema.String, Schema.Int),
   }),
 });
-
-/**
- * Runs probes inside the sidecar container. The peer and operator listener is
- * never published to the host, so this is the only way to reach it, and the
- * sidecar is also where a raw request line or a streamed body can be produced.
- */
-const probe = (
-  ctx: QualificationContext,
-  name: string,
-  probes: readonly Probe[],
-) =>
-  Effect.gen(function* () {
-    const output = yield* ctx.runtime.controls.compose([
-      "exec",
-      "-T",
-      "proxy",
-      "node",
-      "/fixture/security-probe.mjs",
-      JSON.stringify(probes),
-    ]);
-    yield* ctx.artifacts.json(`${name}-requests.json`, probes);
-    yield* ctx.artifacts.text(`${name}-probes.jsonl`, output.stdout);
-    const results: ProbeResult[] = [];
-    for (const line of output.stdout.split("\n"))
-      if (line.trim()) results.push(yield* decodeJson(ProbeResult, line));
-    if (results.length !== probes.length)
-      return yield* Effect.fail(
-        new TckError({
-          phase: "security",
-          message: `Expected ${probes.length} observations, saw ${results.length}`,
-        }),
-      );
-    return results as readonly ProbeResult[];
-  });
 
 /**
  * The state a denial must leave alone: recorded ownership, the acknowledged SQL
@@ -138,7 +104,7 @@ const listenerSeparation = (ctx: QualificationContext) =>
       ctx,
       "listener-separation",
       Effect.gen(function* () {
-        const results = yield* probe(ctx, "listener-separation", [
+        const results = yield* sidecarProbe(ctx, "listener-separation", [
           {
             kind: "http",
             label: "control-operator-state",
@@ -212,7 +178,7 @@ const listenerSeparation = (ctx: QualificationContext) =>
 /** Resident cell scopes, read from every node's operator state. */
 const residentScopes = (ctx: QualificationContext) =>
   Effect.gen(function* () {
-    const results = yield* probe(
+    const results = yield* sidecarProbe(
       ctx,
       "resident-scopes",
       ctx.nodes.map((node): Probe => ({
@@ -312,7 +278,7 @@ const peerAuthentication = (ctx: QualificationContext) =>
             `runtime-forged-${node}`,
           ]),
         ];
-        const results = yield* probe(ctx, "peer-authentication", [
+        const results = yield* sidecarProbe(ctx, "peer-authentication", [
           {
             kind: "http",
             label: "control-unauthenticated-operator",
@@ -399,7 +365,7 @@ const reservedClasses = (ctx: QualificationContext) =>
       ctx,
       "reserved-classes",
       Effect.gen(function* () {
-        const results = yield* probe(ctx, "reserved-classes", [
+        const results = yield* sidecarProbe(ctx, "reserved-classes", [
           // Authorized control: the ordinary-object route is unauthenticated
           // and does reach application code.
           {
@@ -472,7 +438,7 @@ const forwardedHeaders = (ctx: QualificationContext) =>
       ctx,
       "forwarded-headers",
       Effect.gen(function* () {
-        const results = yield* probe(
+        const results = yield* sidecarProbe(
           ctx,
           "forwarded-headers",
           [UNTRUSTED, TRUSTED].flatMap((node): Probe[] => [
@@ -582,7 +548,7 @@ const bodyLimits = (ctx: QualificationContext) =>
       "body-limits",
       Effect.gen(function* () {
         const write = `${publicListener(UNTRUSTED)}/history/write?name=${ctx.name}`;
-        const results = yield* probe(ctx, "body-limits", [
+        const results = yield* sidecarProbe(ctx, "body-limits", [
           // Exactly at the limit: celld admits the body, and the application —
           // not celld — is what rejects the oversized payload inside it.
           {
