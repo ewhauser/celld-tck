@@ -67,8 +67,10 @@ export type LocalOptions = {
       operations?: boolean;
       /** Adds the ownership-balancing overlay. Requires `operations`. */
       balancing?: boolean;
+      /**
        * Adds the per-node image overlay so a run can pin a second celld
        * release. Requires `operations`; `images` seeds the starting pins.
+       */
       upgrade?: boolean;
       images?: Readonly<Record<string, string>>;
     }

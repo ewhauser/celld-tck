@@ -435,6 +435,10 @@ const rebalanceControl = (ctx: QualificationContext) =>
     const live: readonly Node[] = ["celld", "celld2"];
     const staleBefore = yield* fleet.ownership();
     yield* fleet.pause("celld3");
+    // The sample-staleness window alone can close before the node lease
+    // expires on a fast host; the self-fence asserted after unpause needs the
+    // lease to have lapsed, so wait it out explicitly.
+    yield* leaseLapse;
     yield* ballast(ctx, "celld2", "stale", 9);
     const moved = yield* ctx.poll(nodeStates(ctx, live), (states) =>
       live.some((node) => states[node].rebalanced > converged[node].rebalanced),

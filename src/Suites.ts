@@ -20,7 +20,7 @@ export type QualificationSuite =
   | "faults"
   | "capacity"
   | "security"
-  | "telemetry";
+  | "telemetry"
   | "operations";
 
 export type SuiteEntry =
