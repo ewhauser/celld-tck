@@ -872,4 +872,20 @@ export const divergenceMutations = {
       change(["body", "error", "message"], "network unavailable"),
     ),
   ],
+  "dynamic.limits": [
+    mutate(
+      "the limits waiver is stretched to cover a dropped env binding",
+      change(["body"], { token: null, count: 1, upstream: "gateway /binding" }),
+    ),
+  ],
+  "facets.outbound-transaction": [
+    mutate(
+      "the documented restriction is extended to a facet with no open root transaction",
+      change(["body", "control", "outbound"], "rejected"),
+    ),
+    mutate(
+      "the refused outbound also loses the facet write under the waiver",
+      change(["body", "after", "balance"], 10),
+    ),
+  ],
 } satisfies Record<string, readonly [Mutation, ...Mutation[]]>;
