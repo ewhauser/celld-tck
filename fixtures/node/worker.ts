@@ -15,7 +15,7 @@ import {
   types,
 } from "node:util";
 import { gzipSync, gunzipSync, deflateSync, inflateSync } from "node:zlib";
-import { operation, platform, rejection } from "../core/Platform.js";
+import { operation, outcome, platform, rejection } from "../core/Platform.js";
 import core from "../core/worker.js";
 export { Probe, Service, TestWorkflow } from "../core/worker.js";
 export default {
@@ -186,37 +186,61 @@ export default {
             });
           }
           case "/node/stream-timers": {
-            const reader = Readable.toWeb(
-              Readable.from(["a", "λ"]),
-            ).getReader();
-            const chunks: unknown[] = [];
-            for (;;) {
-              const next = yield* platform(() => reader.read());
-              if (next.done) break;
-              chunks.push(next.value);
-            }
-            const binary = yield* platform(() =>
-              new Response(
-                Readable.toWeb(
-                  Readable.from([
-                    new Uint8Array([0, 128]),
-                    new Uint8Array([255]),
-                  ]),
-                ) as unknown as ReadableStream,
-              ).arrayBuffer(),
+            // Readable.toWeb throws synchronously on a runtime that does not
+            // implement it, so each conversion reports its own outcome.
+            const toWeb = (source: Readable) =>
+              operation(
+                () => Readable.toWeb(source) as unknown as ReadableStream,
+              );
+            const chunks = yield* outcome(
+              toWeb(Readable.from(["a", "λ"])).pipe(
+                Effect.flatMap((stream) =>
+                  platform(async () => {
+                    const reader = stream.getReader();
+                    const read: unknown[] = [];
+                    for (;;) {
+                      const next = await reader.read();
+                      if (next.done) break;
+                      read.push(next.value);
+                    }
+                    return read;
+                  }),
+                ),
+              ),
             );
-            const fromWeb = yield* platform(async () => {
-              const parts: string[] = [];
-              for await (const chunk of Readable.fromWeb(
-                new Response("aλ").body as never,
-              ))
-                parts.push(Buffer.from(chunk as Uint8Array).toString("utf8"));
-              return parts.join("");
-            });
+            const binary = yield* outcome(
+              toWeb(
+                Readable.from([
+                  new Uint8Array([0, 128]),
+                  new Uint8Array([255]),
+                ]),
+              ).pipe(
+                Effect.flatMap((stream) =>
+                  platform(() => new Response(stream).arrayBuffer()),
+                ),
+                Effect.map((bytes) => [...new Uint8Array(bytes)]),
+              ),
+            );
+            const fromWeb = yield* outcome(
+              operation(() =>
+                Readable.fromWeb(new Response("aλ").body as never),
+              ).pipe(
+                Effect.flatMap((node) =>
+                  platform(async () => {
+                    const parts: string[] = [];
+                    for await (const chunk of node)
+                      parts.push(
+                        Buffer.from(chunk as Uint8Array).toString("utf8"),
+                      );
+                    return parts.join("");
+                  }),
+                ),
+              ),
+            );
             return Response.json({
               chunks,
-              chunkType: typeof chunks[0],
-              binary: [...new Uint8Array(binary)],
+              chunkType: Array.isArray(chunks) ? typeof chunks[0] : null,
+              binary,
               fromWeb,
               // The shorter sleep must settle first; both are real timers.
               race: yield* platform(() =>

@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { operation, platform, rejection } from "./Platform.js";
+import { operation, outcome, platform, rejection } from "./Platform.js";
 import { encode } from "../shared/Codec.js";
 import { channelMessages, sseBody } from "../shared/Messaging.js";
 
@@ -17,16 +17,6 @@ const exportRaw = (key: CryptoKey) =>
   platform(() => crypto.subtle.exportKey("raw", key) as Promise<ArrayBuffer>);
 const exportJwk = (key: CryptoKey) =>
   platform(() => crypto.subtle.exportKey("jwk", key) as Promise<JsonWebKey>);
-// Observations that may legitimately be a value on one runtime and a rejection on
-// another keep the error name in place of the value instead of failing the request.
-const outcome = <A>(effect: Effect.Effect<A, unknown>) =>
-  effect.pipe(
-    Effect.catch((cause) =>
-      Effect.succeed(
-        (cause instanceof Error ? cause.name : "Unknown") as A | string,
-      ),
-    ),
-  );
 export const web = (request: Request) =>
   Effect.gen(function* () {
     const path = new URL(request.url).pathname;
