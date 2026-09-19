@@ -8,7 +8,7 @@ The suite currently pins celld v0.5.0. Upstream documentation changes independen
 
 | Order | Workstream                          | Starting point                                                                                                                | Environment                                                          |
 | ----- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| 1     | Storage durability contracts        | Barrier, cursor, and deadline cases implemented; post-abort sync remains open                                                 | Local workerd and celld; fault scenarios on celld                    |
+| 1     | Storage durability contracts        | Barrier, cursor, deadline, post-abort, and interrupted-replication cases implemented; cloud durability remains open           | Local workerd and celld; fault scenarios on celld                    |
 | 2     | In-place deployment                 | Explicit reload and invalid-replacement cases implemented; lifecycle transitions remain open                                  | Local celld fleet                                                    |
 | 3     | Security boundaries                 | Listener, reserved-class, forwarded-header, and body-limit cases implemented; peer credential ageing and replay remain open   | Isolated local celld fleet                                           |
 | 4     | Assets, dynamic Workers, and facets | One API case per feature                                                                                                      | Local reference and candidate, with celld recovery scenarios         |
@@ -17,7 +17,6 @@ The suite currently pins celld v0.5.0. Upstream documentation changes independen
 | 7     | CLI and telemetry                   | CLI, trace-context, OTLP export, Parquet, and collector-outage cases implemented; retention and the bounded queue remain open | Local celld, object store, and recording OTLP collector              |
 | 8     | Containers and Sandbox              | Explicitly excluded today                                                                                                     | Separate container-runtime test environment                          |
 | 9     | Cloud qualification                 | Local MinIO coverage only                                                                                                     | Dedicated provider accounts and managed reference environment        |
-| 1     | Storage durability contracts        | Barrier, cursor, deadline, post-abort, and interrupted-replication cases implemented; cloud durability remains open         | Local workerd and celld; fault scenarios on celld                    |
 
 These are implementation priorities, not release dates. Keep workstreams independently reviewable.
 
