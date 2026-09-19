@@ -8,7 +8,7 @@ The suite currently pins celld v0.5.0. Upstream documentation changes independen
 
 | Order | Workstream                          | Starting point                                                                                                                | Environment                                                          |
 | ----- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| 1     | Storage durability contracts        | Barrier, cursor, and deadline cases implemented; post-abort sync remains open                                                 | Local workerd and celld; fault scenarios on celld                    |
+| 1     | Storage durability contracts        | Barrier, cursor, deadline, post-abort, and interrupted-replication cases implemented; cloud durability remains open           | Local workerd and celld; fault scenarios on celld                    |
 | 2     | In-place deployment                 | Explicit reload and invalid-replacement cases implemented; lifecycle transitions remain open                                  | Local celld fleet                                                    |
 | 3     | Security boundaries                 | Listener, reserved-class, forwarded-header, and body-limit cases implemented; peer credential ageing and replay remain open   | Isolated local celld fleet                                           |
 | 4     | Assets, dynamic Workers, and facets | One API case per feature                                                                                                      | Local reference and candidate, with celld recovery scenarios         |
@@ -23,9 +23,9 @@ These are implementation priorities, not release dates. Keep workstreams indepen
 ## 1. Storage durability contracts
 
 - [x] Exercise `storage.sync()` after committed writes and during an open transaction.
-- [ ] Exercise `storage.sync()` after object abort with an oracle that distinguishes sync rejection from the abort itself.
+- [x] Exercise `storage.sync()` after object abort with an oracle that distinguishes sync rejection from the abort itself.
 - [x] Interrupt object storage while synchronization is pending; verify failure classification and recovery of acknowledged writes using independent evidence.
-- [ ] Interrupt peer replication during a synchronization barrier.
+- [x] Interrupt peer replication during a synchronization barrier.
 - [x] Leave a SQL write `RETURNING` cursor unfinished and test response, outbound-effect, and synchronization boundaries. Contrast with a fully consumed write cursor and an open read cursor.
 - [x] Test transaction and `blockConcurrencyWhile()` deadlines, rollback, and object reset.
 

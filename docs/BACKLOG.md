@@ -19,4 +19,4 @@ External qualification remains unavailable without dedicated AWS and managed Clo
 
 The MinIO conditional-write diagnostic reset remains tracked as INFRA-001 in [BUGS.md](BUGS.md), without a waiver. All suites now diagnose through a proxy that opens a fresh upstream connection per request. Qualification uses the same transport for runtime storage; other suites retain direct-MinIO runtime traffic.
 
-Eight additional [storage durability cases](STORAGE-DURABILITY.md) extend the fault suite with sync barriers, cursor restrictions, and runtime deadlines. Post-abort sync and interrupted peer replication remain follow-ups; the linked coverage document states the precise limits.
+Ten additional [storage durability cases](STORAGE-DURABILITY.md) extend the fault suite with sync barriers, cursor restrictions, runtime deadlines, a barrier armed across an object reset, and a barrier held open while the owner loses every peer. Cloud durability remains a follow-up; the linked coverage document states the precise limits.

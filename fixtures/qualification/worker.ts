@@ -100,7 +100,7 @@ export class Recovery extends DurableObject<QualificationEnv> {
         const storage = this.ctx.storage;
         const durability = yield* durabilityOperation(
           this.ctx,
-          url.pathname,
+          url,
           (cursor) => {
             this.durabilityCursor = cursor;
           },
