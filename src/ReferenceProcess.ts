@@ -8,6 +8,22 @@ import { sha256 } from "./Build.js";
 import { TckError } from "./Domain.js";
 import { ReferenceConfig } from "./ReferenceConfig.js";
 
+// Wrangler's own translation of `assets.run_worker_first`: a boolean sets the
+// unconditional order, while an array becomes static routing where a `!/`
+// pattern keeps the default asset-first order for the paths it matches.
+// https://developers.cloudflare.com/workers/static-assets/binding/#run_worker_first
+const staticRouting = (runWorkerFirst: boolean | ReadonlyArray<string>) =>
+  typeof runWorkerFirst === "boolean"
+    ? { invoke_user_worker_ahead_of_assets: runWorkerFirst }
+    : {
+        static_routing: {
+          user_worker: runWorkerFirst.filter((rule) => !rule.startsWith("!")),
+          asset_worker: runWorkerFirst
+            .filter((rule) => rule.startsWith("!/"))
+            .map((rule) => rule.slice(1)),
+        },
+      };
+
 // The parent owns this entire process and captures stdout/stderr. Miniflare's
 // own signal hook can safely stop workerd here without terminating the driver.
 const program = Effect.scoped(
@@ -58,8 +74,28 @@ const program = Effect.scoped(
                     binding: config.config.assets.binding,
                     routerConfig: {
                       has_user_worker: true,
-                      invoke_user_worker_ahead_of_assets: true,
+                      ...staticRouting(config.config.assets.run_worker_first),
                     },
+                    ...(config.config.assets.html_handling === undefined &&
+                    config.config.assets.not_found_handling === undefined
+                      ? {}
+                      : {
+                          assetConfig: {
+                            ...(config.config.assets.html_handling === undefined
+                              ? {}
+                              : {
+                                  html_handling:
+                                    config.config.assets.html_handling,
+                                }),
+                            ...(config.config.assets.not_found_handling ===
+                            undefined
+                              ? {}
+                              : {
+                                  not_found_handling:
+                                    config.config.assets.not_found_handling,
+                                }),
+                          },
+                        }),
                   },
                 }
               : {}),

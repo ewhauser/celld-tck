@@ -45,12 +45,14 @@ export const buildFixtureFor = (
         new TckError({ phase: "build", message: "Missing fixture DO binding" }),
       );
     let dynamicCode = "";
-    if (fixture === "extensions") {
+    // Both the extensions fixture and the recovery fixture load a child bundle
+    // through a Worker Loader binding; only the former ships static assets.
+    if (fixture === "extensions" || fixture === "recovery") {
       const child = yield* Effect.tryPromise({
         try: () =>
           build({
             entryPoints: [
-              new URL("../fixtures/extensions/child.ts", import.meta.url)
+              new URL(`../fixtures/${fixture}/child.ts`, import.meta.url)
                 .pathname,
             ],
             bundle: true,
@@ -69,10 +71,11 @@ export const buildFixtureFor = (
         return yield* Effect.fail(
           new TckError({ phase: "build", message: "Empty dynamic fixture" }),
         );
-      yield* fs.copy(
-        new URL("../fixtures/extensions/assets", import.meta.url).pathname,
-        resolve(directory, "assets"),
-      );
+      if (fixture === "extensions")
+        yield* fs.copy(
+          new URL("../fixtures/extensions/assets", import.meta.url).pathname,
+          resolve(directory, "assets"),
+        );
     }
     yield* Effect.tryPromise({
       try: () =>

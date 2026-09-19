@@ -147,7 +147,12 @@
     },
     {
       "family": "assets",
-      "cases": ["assets.binding", "assets.html-routing", "assets.redirects"]
+      "cases": [
+        "assets.binding",
+        "assets.html-routing",
+        "assets.redirects",
+        "assets.worker-first"
+      ]
     },
     {
       "family": "dynamic",
@@ -155,12 +160,17 @@
         "dynamic.fetch",
         "dynamic.props",
         "dynamic.bindings",
-        "dynamic.outbound"
+        "dynamic.outbound",
+        "dynamic.limits"
       ]
     },
     {
       "family": "facets",
-      "cases": ["facets.isolation", "facets.transaction"]
+      "cases": [
+        "facets.isolation",
+        "facets.transaction",
+        "facets.outbound-transaction"
+      ]
     },
     {
       "family": "context",

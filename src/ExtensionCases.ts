@@ -1,6 +1,17 @@
+import { Effect } from "effect";
 import { endpoint } from "./CoreCases.js";
+import { define, response } from "./Cases.js";
+import { Transport, type Target } from "./Domain.js";
+import { equal } from "./Oracle.js";
 const assetDoc = "https://developers.cloudflare.com/workers/static-assets/";
 const loaderDoc = "https://developers.cloudflare.com/dynamic-workers/";
+// Static routing is decided by the platform before any fixture code runs, so
+// these observations come from the public listener rather than a binding.
+const direct = (target: Target, path: string) =>
+  Effect.gen(function* () {
+    const transport = yield* Transport;
+    return yield* transport.request(target, { path });
+  });
 export const extensionCases = [
   endpoint(
     "wasm.module",
@@ -84,6 +95,29 @@ export const extensionCases = [
     },
     `${assetDoc}routing/advanced/redirects/`,
   ),
+  {
+    ...define(
+      "assets.worker-first",
+      (target) =>
+        Effect.gen(function* () {
+          // A Worker route and an asset exist at both paths; only the static
+          // routing rules decide which one answers.
+          return [
+            yield* direct(target, "/shadowed.txt"),
+            yield* direct(target, "/asset-first/note.txt"),
+          ];
+        }),
+      () => [
+        response({ served: "worker", path: "/shadowed.txt" }),
+        {
+          status: 200,
+          headers: { "content-type": "text/plain; charset=utf-8" },
+          body: "asset-first λ\n",
+        },
+      ],
+    ),
+    contract: `${assetDoc}binding/#run_worker_first`,
+  },
   endpoint(
     "dynamic.fetch",
     "/dynamic/fetch",
@@ -114,6 +148,55 @@ export const extensionCases = [
     },
     `${loaderDoc}usage/egress-control/`,
   ),
+  {
+    ...endpoint(
+      "dynamic.limits",
+      "/dynamic/limits",
+      { token: "limited λ", count: 1, upstream: "gateway /binding" },
+      `${loaderDoc}usage/limits/`,
+    ),
+    divergence: {
+      celldVersion: "0.5.0",
+      compatibilityDate: "2026-07-30",
+      compatibilityFlags: [],
+      source: "https://celld.dev/docs/cloudflare-compat/#dynamic-workers",
+      reason: "celld rejects the WorkerCode limits field",
+      reviewDate: "2026-09-18",
+      owner: "celld-tck maintainers",
+      check: (value: unknown) => equal(value, response({ rejected: true })),
+    },
+  },
+  {
+    ...endpoint(
+      "facets.outbound-transaction",
+      "/facets/outbound",
+      {
+        control: { balance: 40, outbound: "gateway /facet" },
+        inTransaction: { balance: 40, outbound: "gateway /facet" },
+        after: { balance: 40 },
+      },
+      "https://celld.dev/docs/cloudflare-compat/#durable-object-facets",
+    ),
+    divergence: {
+      celldVersion: "0.5.0",
+      compatibilityDate: "2026-07-30",
+      compatibilityFlags: [],
+      source: "https://celld.dev/docs/cloudflare-compat/#durable-object-facets",
+      reason:
+        "celld rejects an outbound effect from a facet while a root storage transaction holds an uncommitted facet image",
+      reviewDate: "2026-09-18",
+      owner: "celld-tck maintainers",
+      check: (value: unknown) =>
+        equal(
+          value,
+          response({
+            control: { balance: 40, outbound: "gateway /facet" },
+            inTransaction: { balance: 40, outbound: "rejected" },
+            after: { balance: 40 },
+          }),
+        ),
+    },
+  },
   endpoint(
     "facets.isolation",
     "/facets/isolation",

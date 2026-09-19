@@ -1,9 +1,16 @@
 import { DurableObject } from "cloudflare:workers";
 import { Effect } from "effect";
 import { platform, ready } from "../shared/Platform.js";
+declare const __DYNAMIC_CODE__: string;
 interface RecoveryEnv {
   PROBE: DurableObjectNamespace<Recovery>;
+  LOADER: WorkerLoader;
 }
+const facetCode = () => ({
+  compatibilityDate: "2026-07-30",
+  mainModule: "worker.js",
+  modules: { "worker.js": __DYNAMIC_CODE__ },
+});
 export class Recovery extends DurableObject<RecoveryEnv> {
   private readonly activation = crypto.randomUUID();
   alarm() {
@@ -15,11 +22,31 @@ export class Recovery extends DurableObject<RecoveryEnv> {
     const storage = this.ctx.storage;
     const activation = this.activation;
     const cell = this.ctx.id.toString();
+    // A facet needs a class from a Worker Loader binding on both runtimes.
+    const ledger = (path: string) =>
+      platform(() =>
+        this.ctx.facets
+          .get("ledger", () => ({
+            class: this.env.LOADER.get(
+              "recovery-facet-v1",
+              facetCode,
+            ).getDurableObjectClass("Ledger"),
+          }))
+          .fetch(`https://fixture.test${path}`),
+      ).pipe(
+        Effect.flatMap((response) =>
+          platform(() => response.json<Record<string, unknown>>()),
+        ),
+      );
     return Effect.runPromise(
       Effect.gen(function* () {
         const path = new URL(request.url).pathname;
         if (path === "/ready") return ready();
         if (path === "/fleet/id") return Response.json({ cell });
+        if (path === "/facet/seed")
+          return Response.json({ ...(yield* ledger("/seed")), activation });
+        if (path === "/facet/state")
+          return Response.json({ ...(yield* ledger("/state")), activation });
         if (path === "/outage/write") {
           const id = Number(new URL(request.url).searchParams.get("id"));
           if (!Number.isInteger(id) || id < 1 || id > 256)
