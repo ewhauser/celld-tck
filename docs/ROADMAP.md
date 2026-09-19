@@ -73,11 +73,13 @@ Implemented coverage and limits are in [EXTENSIONS.md](EXTENSIONS.md).
 - [ ] **Cron:** occurrence timing, fleet-wide deduplication, missed occurrences, serialization, retry, and `noRetry()`. Establish a controllable scheduling environment first.
 - [ ] **TCP/TLS:** connection lifecycle, read/write errors, certificate validation, and event lifetime with a controlled server.
 - [ ] **WebSockets:** outbound lifetime, overload, and close/reconnect behavior during ownership changes. Preserve the existing real-hibernation coverage.
-- [ ] **Runtime APIs:** EventSource, MessageChannel, additional supported Node.js APIs, and Web Crypto algorithms and invalid inputs.
+- [ ] **Runtime APIs:** covered so far: ECDSA P-256 sign/verify with JWK and raw public-key round trips, PBKDF2/HKDF derivation against published vectors, secret-key raw/JWK export, a SubtleCrypto invalid-input matrix, MessagePort structured-clone ordering and close, an `EventSource.from()` server-sent event stream, and `node:util`, `node:assert`, and `node:stream`/`node:timers/promises` interop. Remaining: RSA-OAEP, Ed25519, X25519/ECDH, AES-CTR/CBC/KW, wrapKey/unwrapKey, `pkcs8`/`spki` formats, `crypto.DigestStream` and `timingSafeEqual`, network-backed `EventSource` with a `fetcher` binding and its reconnection/`Last-Event-ID` behavior, MessagePort transfer lists (rejected by the pinned workerd), and the remaining documented Node.js modules (`node:diagnostics_channel`, `node:fs`, `node:os`, and `node:crypto` beyond digests and compression).
 - [ ] **Compatibility flags:** exercise relevant behavior with flags enabled and disabled, including documented unsupported combinations.
 - [ ] **Service boundaries:** inventory KV, D1, R2, Queues, and Workflows operations and limits against existing cases; add targeted cases for uncovered supported behavior.
 
 Document whether each reference result comes from local workerd emulation or managed Cloudflare. Do not treat their service guarantees as interchangeable.
+
+The Web Crypto and messaging work registered one documented divergence (`crypto.key-export`: celld cannot export a secret key as `jwk`) and three known bugs, CELL-005 to CELL-007, in [BUGS.md](BUGS.md).
 
 ## 6. Fleet operations and binary upgrades
 

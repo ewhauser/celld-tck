@@ -177,6 +177,18 @@ const knownBugMutations: Record<string, Mutation> = {
     name: "the canonical redirect is also lost",
     changes: [{ path: ["body", "folder", "location"], value: null }],
   },
+  "crypto.ecdsa-p256": {
+    name: "a valid signature is rejected in addition to the known bug",
+    changes: [{ path: ["body", "verified"], value: false }],
+  },
+  "crypto.invalid-input": {
+    name: "a still-enforced rejection changes class",
+    changes: [{ path: ["body", "emptyIv"], value: "accepted" }],
+  },
+  "node.stream-timers": {
+    name: "a conforming timer result breaks alongside the known bug",
+    changes: [{ path: ["body", "race"], value: "slow" }],
+  },
   "repro.body-readers": {
     name: "fresh body is already marked used",
     changes: [{ path: ["body", 0, "before"], value: true }],

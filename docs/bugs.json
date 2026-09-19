@@ -35,6 +35,33 @@
       "owner": "celld-tck maintainers",
       "reviewedAt": "2026-09-18",
       "upstreamIssue": null
+    },
+    {
+      "id": "CELL-005",
+      "title": "EC public key export returns SPKI for the raw format and omits JWK metadata",
+      "status": "open",
+      "report": "upstream/webcrypto-ec-key-export.md",
+      "owner": "celld-tck maintainers",
+      "reviewedAt": "2026-09-18",
+      "upstreamIssue": null
+    },
+    {
+      "id": "CELL-006",
+      "title": "SubtleCrypto does not enforce key usages or key lengths and misclassifies malformed JWK input",
+      "status": "open",
+      "report": "upstream/webcrypto-input-validation.md",
+      "owner": "celld-tck maintainers",
+      "reviewedAt": "2026-09-18",
+      "upstreamIssue": null
+    },
+    {
+      "id": "CELL-007",
+      "title": "node:stream Readable.toWeb and Readable.fromWeb throw TypeError",
+      "status": "open",
+      "report": "upstream/node-stream-web-interop.md",
+      "owner": "celld-tck maintainers",
+      "reviewedAt": "2026-09-18",
+      "upstreamIssue": null
     }
   ],
   "expectations": [
@@ -311,6 +338,95 @@
       },
       "compatibilityDate": "2026-07-30",
       "compatibilityFlags": []
+    },
+    {
+      "caseId": "crypto.ecdsa-p256",
+      "bugIds": ["CELL-005"],
+      "celldVersion": "0.5.0",
+      "evidenceRun": "tck-0c3c37cf-d018-4e54-b741-aeec138d7628",
+      "candidate": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "signatureBytes": 64,
+          "verified": true,
+          "tampered": false,
+          "jwkVerified": true,
+          "rawVerified": "NotSupportedError",
+          "jwk": {
+            "kty": "EC",
+            "crv": "P-256",
+            "xBytes": 32,
+            "yBytes": 32,
+            "privateOmitted": true
+          },
+          "raw": {
+            "bytes": 91,
+            "uncompressed": false
+          },
+          "usages": {
+            "private": ["sign"],
+            "public": ["verify"]
+          },
+          "algorithm": {
+            "name": "ECDSA",
+            "namedCurve": "P-256"
+          },
+          "types": ["private", "public"]
+        }
+      },
+      "compatibilityDate": "2026-07-30",
+      "compatibilityFlags": []
+    },
+    {
+      "caseId": "crypto.invalid-input",
+      "bugIds": ["CELL-006"],
+      "celldVersion": "0.5.0",
+      "evidenceRun": "tck-0c3c37cf-d018-4e54-b741-aeec138d7628",
+      "candidate": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "wrongUsage": "accepted",
+          "unknownAlgorithm": "NotSupportedError",
+          "unknownHash": "NotSupportedError",
+          "badKeyLength": "accepted",
+          "malformedJwk": "Error",
+          "emptyUsages": "accepted",
+          "mismatchedUsage": "accepted",
+          "nonExtractable": "InvalidAccessError",
+          "emptyIv": "OperationError"
+        }
+      },
+      "compatibilityDate": "2026-07-30",
+      "compatibilityFlags": []
+    },
+    {
+      "caseId": "node.stream-timers",
+      "bugIds": ["CELL-007"],
+      "celldVersion": "0.5.0",
+      "evidenceRun": "tck-3168c226-4b59-4847-b179-739fd47fa9f7",
+      "candidate": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "chunks": "TypeError",
+          "chunkType": null,
+          "binary": "TypeError",
+          "fromWeb": "TypeError",
+          "race": "fast",
+          "immediate": "soon",
+          "aborted": "AbortError"
+        }
+      },
+      "compatibilityDate": "2026-07-30",
+      "compatibilityFlags": ["nodejs_compat"]
     }
   ]
 }

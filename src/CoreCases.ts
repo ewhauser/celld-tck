@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect";
 import { pollUntil } from "./Polling.js";
 import { encode, richValue } from "../fixtures/shared/Codec.js";
+import { channelMessages } from "../fixtures/shared/Messaging.js";
 import { call, define, response, initialCases } from "./Cases.js";
 import { Transport, TckError, toTckError, type TestCase } from "./Domain.js";
 import { decodeAs } from "./Artifacts.js";
@@ -20,6 +21,7 @@ export const endpoint = (
   contract,
 });
 const webDoc = "https://developers.cloudflare.com/workers/runtime-apis/";
+const cryptoDoc = webDoc + "web-crypto/";
 const storageDoc =
   "https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/";
 const ep = (id: string, path: string, expected: unknown) =>
@@ -216,6 +218,149 @@ export const coreCases: ReadonlyArray<TestCase> = [
     plaintext: [],
     tampered: "OperationError",
   }),
+  endpoint(
+    "crypto.ecdsa-p256",
+    "/web/ecdsa",
+    {
+      signatureBytes: 64,
+      verified: true,
+      tampered: false,
+      jwkVerified: true,
+      rawVerified: true,
+      jwk: {
+        kty: "EC",
+        crv: "P-256",
+        ext: true,
+        keyOps: ["verify"],
+        xBytes: 32,
+        yBytes: 32,
+        privateOmitted: true,
+      },
+      raw: { bytes: 65, uncompressed: true },
+      usages: { private: ["sign"], public: ["verify"] },
+      algorithm: { name: "ECDSA", namedCurve: "P-256" },
+      types: ["private", "public"],
+    },
+    cryptoDoc,
+  ),
+  endpoint(
+    "crypto.key-derivation",
+    "/web/derive",
+    {
+      // PBKDF2-HMAC-SHA-256("password", "salt", 4096, 256 bits) and RFC 5869
+      // HKDF-SHA-256 test case 1, both independently reproduced with node:crypto.
+      pbkdf2:
+        "c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a",
+      hkdf: "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865",
+      derivedMac:
+        "08d3277c85e4850fcc2d3599090b3e13814fdb36925068cb91273b336fe3f5b0",
+      derivedAlgorithm: {
+        name: "HMAC",
+        hash: { name: "SHA-256" },
+        length: 256,
+      },
+      unalignedLength: "OperationError",
+      zeroIterations: "OperationError",
+    },
+    cryptoDoc,
+  ),
+  {
+    ...endpoint(
+      "crypto.key-export",
+      "/web/key-export",
+      {
+        hmacRaw: [107, 101, 121],
+        aesRaw: Array.from({ length: 16 }, (_, i) => i),
+        hmacJwk: {
+          kty: "oct",
+          alg: "HS256",
+          keyOps: ["sign", "verify"],
+          ext: true,
+          k: "a2V5",
+        },
+        aesJwk: {
+          kty: "oct",
+          alg: "A128GCM",
+          keyOps: ["encrypt", "decrypt"],
+          ext: true,
+          k: "AAECAwQFBgcICQoLDA0ODw",
+        },
+        algorithms: [
+          { name: "HMAC", hash: { name: "SHA-256" }, length: 24 },
+          { name: "AES-GCM", length: 128 },
+        ],
+      },
+      cryptoDoc,
+    ),
+    divergence: {
+      celldVersion: "0.5.0",
+      compatibilityDate: "2026-07-30",
+      compatibilityFlags: [],
+      source: "https://celld.dev/docs/cloudflare-compat/#web-crypto",
+      reason:
+        "celld documents that a secret key cannot use jwk with exportKey() or wrapKey()",
+      reviewDate: "2026-09-18",
+      owner: "celld-tck maintainers",
+      check: (value) =>
+        equal(
+          value,
+          response({
+            hmacRaw: [107, 101, 121],
+            aesRaw: Array.from({ length: 16 }, (_, i) => i),
+            hmacJwk: "NotSupportedError",
+            aesJwk: "NotSupportedError",
+            algorithms: [
+              { name: "HMAC", hash: { name: "SHA-256" }, length: 24 },
+              { name: "AES-GCM", length: 128 },
+            ],
+          }),
+        ),
+    },
+  },
+  endpoint(
+    "crypto.invalid-input",
+    "/web/crypto-invalid",
+    {
+      wrongUsage: "InvalidAccessError",
+      unknownAlgorithm: "NotSupportedError",
+      unknownHash: "NotSupportedError",
+      badKeyLength: "DataError",
+      malformedJwk: "DataError",
+      emptyUsages: "SyntaxError",
+      mismatchedUsage: "SyntaxError",
+      nonExtractable: "InvalidAccessError",
+      emptyIv: "OperationError",
+    },
+    cryptoDoc,
+  ),
+  endpoint(
+    "messaging.message-channel",
+    "/messaging/channel",
+    {
+      synchronous: 0,
+      messages: encode(channelMessages()),
+      unserializable: "DataCloneError",
+      afterClose: "accepted",
+      droppedAfterClose: true,
+    },
+    "https://developer.mozilla.org/en-US/docs/Web/API/MessageChannel",
+  ),
+  endpoint(
+    "messaging.event-source",
+    "/messaging/event-source",
+    {
+      events: [
+        { type: "greeting", data: "hello λ", lastEventId: "1" },
+        { type: "message", data: "line one\nline two", lastEventId: "1" },
+      ],
+      trace: ["error"],
+      exhausted: 2,
+      closed: 2,
+      states: [0, 1, 2],
+      withCredentials: false,
+    },
+    "https://developers.cloudflare.com/workers/runtime-apis/eventsource/",
+  ),
   ep("web.html-rewriter", "/web/html", {
     html: '<p data-test="yes">λ &amp; text</p>',
   }),

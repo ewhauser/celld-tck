@@ -48,11 +48,22 @@
     },
     {
       "family": "crypto",
-      "cases": ["crypto.sha256-hmac", "crypto.aes-gcm"]
+      "cases": [
+        "crypto.sha256-hmac",
+        "crypto.aes-gcm",
+        "crypto.ecdsa-p256",
+        "crypto.key-derivation",
+        "crypto.key-export",
+        "crypto.invalid-input"
+      ]
     },
     {
       "family": "web",
       "cases": ["web.html-rewriter"]
+    },
+    {
+      "family": "messaging",
+      "cases": ["messaging.message-channel", "messaging.event-source"]
     },
     {
       "family": "identity",
@@ -124,7 +135,10 @@
         "node.buffer",
         "node.path-events",
         "node.async-context",
-        "node.hash-compression"
+        "node.hash-compression",
+        "node.util",
+        "node.assert",
+        "node.stream-timers"
       ]
     },
     {

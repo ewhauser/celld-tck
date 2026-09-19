@@ -33,6 +33,22 @@
     {
       "runId": "tck-0c9aa3ed-1709-4edd-9651-fb1b244bc9b8",
       "sourceRevision": "b723207c722f30400994f13075d993216a9b91a7"
+    },
+    {
+      "runId": "tck-6cd64cf6-980a-495c-9159-92b3ce50bba5",
+      "sourceRevision": "5f7b777031fcfa4979a9da48bfabf4fd7e392543"
+    },
+    {
+      "runId": "tck-b468f0a9-841f-472d-b65b-4cb870f09ce2",
+      "sourceRevision": "790c81c7c2108a5669c95be34a1aac2a91c80438"
+    },
+    {
+      "runId": "tck-ac34e3c4-c3af-48c6-8c52-80727e1b8aeb",
+      "sourceRevision": "790c81c7c2108a5669c95be34a1aac2a91c80438"
+    },
+    {
+      "runId": "tck-0c3c37cf-d018-4e54-b741-aeec138d7628",
+      "sourceRevision": "0b59e3217d67aa00e2b887a0de4ca83fc26c0c52"
     }
   ],
   "cases": {
@@ -1878,6 +1894,287 @@
           "balance": 20
         }
       }
+    },
+    "crypto.ecdsa-p256": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "signatureBytes": 64,
+        "verified": true,
+        "tampered": false,
+        "jwkVerified": true,
+        "rawVerified": true,
+        "jwk": {
+          "kty": "EC",
+          "crv": "P-256",
+          "ext": true,
+          "keyOps": ["verify"],
+          "xBytes": 32,
+          "yBytes": 32,
+          "privateOmitted": true
+        },
+        "raw": {
+          "bytes": 65,
+          "uncompressed": true
+        },
+        "usages": {
+          "private": ["sign"],
+          "public": ["verify"]
+        },
+        "algorithm": {
+          "name": "ECDSA",
+          "namedCurve": "P-256"
+        },
+        "types": ["private", "public"]
+      }
+    },
+    "crypto.key-derivation": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "pbkdf2": "c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a",
+        "hkdf": "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865",
+        "derivedMac": "08d3277c85e4850fcc2d3599090b3e13814fdb36925068cb91273b336fe3f5b0",
+        "derivedAlgorithm": {
+          "name": "HMAC",
+          "hash": {
+            "name": "SHA-256"
+          },
+          "length": 256
+        },
+        "unalignedLength": "OperationError",
+        "zeroIterations": "OperationError"
+      }
+    },
+    "crypto.key-export": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "hmacRaw": [107, 101, 121],
+        "aesRaw": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        "hmacJwk": {
+          "kty": "oct",
+          "alg": "HS256",
+          "keyOps": ["sign", "verify"],
+          "ext": true,
+          "k": "a2V5"
+        },
+        "aesJwk": {
+          "kty": "oct",
+          "alg": "A128GCM",
+          "keyOps": ["encrypt", "decrypt"],
+          "ext": true,
+          "k": "AAECAwQFBgcICQoLDA0ODw"
+        },
+        "algorithms": [
+          {
+            "name": "HMAC",
+            "hash": {
+              "name": "SHA-256"
+            },
+            "length": 24
+          },
+          {
+            "name": "AES-GCM",
+            "length": 128
+          }
+        ]
+      }
+    },
+    "crypto.invalid-input": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "wrongUsage": "InvalidAccessError",
+        "unknownAlgorithm": "NotSupportedError",
+        "unknownHash": "NotSupportedError",
+        "badKeyLength": "DataError",
+        "malformedJwk": "DataError",
+        "emptyUsages": "SyntaxError",
+        "mismatchedUsage": "SyntaxError",
+        "nonExtractable": "InvalidAccessError",
+        "emptyIv": "OperationError"
+      }
+    },
+    "messaging.message-channel": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "synchronous": 0,
+        "messages": {
+          "type": "Array",
+          "value": [
+            {
+              "type": "string",
+              "value": "first"
+            },
+            {
+              "type": "Object",
+              "value": [
+                [
+                  "bytes",
+                  {
+                    "type": "Uint8Array",
+                    "value": [0, 255]
+                  }
+                ],
+                [
+                  "n",
+                  {
+                    "type": "number",
+                    "value": 2
+                  }
+                ],
+                [
+                  "set",
+                  {
+                    "type": "Set",
+                    "value": [
+                      {
+                        "type": "string",
+                        "value": "a"
+                      }
+                    ]
+                  }
+                ]
+              ]
+            },
+            {
+              "type": "Array",
+              "value": [
+                {
+                  "type": "number",
+                  "value": 3
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          ]
+        },
+        "unserializable": "DataCloneError",
+        "afterClose": "accepted",
+        "droppedAfterClose": true
+      }
+    },
+    "messaging.event-source": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "events": [
+          {
+            "type": "greeting",
+            "data": "hello λ",
+            "lastEventId": "1"
+          },
+          {
+            "type": "message",
+            "data": "line one\nline two",
+            "lastEventId": "1"
+          }
+        ],
+        "trace": ["error"],
+        "exhausted": 2,
+        "closed": 2,
+        "states": [0, 1, 2],
+        "withCredentials": false
+      }
+    },
+    "node.util": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "promisified": "value:x",
+        "promisifiedError": "TypeError",
+        "inspect": "{ a: 1, b: [ 1, 2 ], c: 'λ' }",
+        "inspectDepth": "{ a: { b: { c: [Object] } } }",
+        "format": "x:2:{\"a\":1}",
+        "types": {
+          "date": true,
+          "view": true,
+          "promise": true,
+          "map": true,
+          "notDate": false
+        },
+        "deepEqual": [true, false],
+        "sharedEncoder": [2, "λ"]
+      }
+    },
+    "node.assert": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "satisfied": "accepted",
+        "strictEqual": {
+          "name": "AssertionError",
+          "code": "ERR_ASSERTION",
+          "operator": "strictEqual",
+          "actual": 1,
+          "expected": 2
+        },
+        "deepStrictEqual": {
+          "name": "AssertionError",
+          "code": "ERR_ASSERTION",
+          "operator": "deepStrictEqual",
+          "actual": {
+            "a": [1]
+          },
+          "expected": {
+            "a": [2]
+          }
+        },
+        "typeSensitive": {
+          "name": "AssertionError",
+          "code": "ERR_ASSERTION",
+          "operator": "deepStrictEqual",
+          "actual": {
+            "a": 1
+          },
+          "expected": {
+            "a": "1"
+          }
+        },
+        "throws": "accepted",
+        "throwsMissing": {
+          "name": "AssertionError",
+          "code": "ERR_ASSERTION",
+          "operator": "throws"
+        },
+        "rejects": "accepted",
+        "resolvedNotRejected": "AssertionError"
+      }
+    },
+    "node.stream-timers": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "chunks": ["a", "λ"],
+        "chunkType": "string",
+        "binary": [0, 128, 255],
+        "fromWeb": "aλ",
+        "race": "fast",
+        "immediate": "soon",
+        "aborted": "AbortError"
+      }
     }
   },
   "divergences": {
@@ -1901,6 +2198,31 @@
           "name": "Error",
           "message": "RPC stubs cannot cross isolate boundaries yet."
         }
+      }
+    },
+    "crypto.key-export": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "hmacRaw": [107, 101, 121],
+        "aesRaw": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        "hmacJwk": "NotSupportedError",
+        "aesJwk": "NotSupportedError",
+        "algorithms": [
+          {
+            "name": "HMAC",
+            "hash": {
+              "name": "SHA-256"
+            },
+            "length": 24
+          },
+          {
+            "name": "AES-GCM",
+            "length": 128
+          }
+        ]
       }
     }
   }

@@ -8,6 +8,9 @@
 | CELL-002 | Open   | [Negative list limit error class](upstream/storage-list-validation.md)                 | `storage.invalid-input`, `repro.storage-errors` |
 | CELL-003 | Open   | [Uncloneable storage value error class](upstream/storage-clone-errors.md)              | `storage.invalid-input`, `repro.storage-errors` |
 | CELL-004 | Open   | [Missing directory index for a trailing-slash path](upstream/asset-directory-index.md) | `assets.html-routing`                           |
+| CELL-005 | Open   | [EC public key export formats](upstream/webcrypto-ec-key-export.md)                    | `crypto.ecdsa-p256`                             |
+| CELL-006 | Open   | [SubtleCrypto key usage and length validation](upstream/webcrypto-input-validation.md) | `crypto.invalid-input`                          |
+| CELL-007 | Open   | [node:stream web-stream interop](upstream/node-stream-web-interop.md)                  | `node.stream-timers`                            |
 
 ## Run policy
 
@@ -20,7 +23,7 @@ pnpm tck --profile local --suite repros
 pnpm tck --profile local --known-bugs error
 ```
 
-`--known-bugs error` disables waivers without changing expectations. Reference runs never receive waivers. Unexpected passes require retiring or revising the expectation; they fail under the default policy. Changed observations, unreviewed celld versions, transport errors, assertion defects, reference failures, and setup/cleanup errors still fail. Existing intentional cache/RPC divergences retain their separate policy.
+`--known-bugs error` disables waivers without changing expectations. Reference runs never receive waivers. Unexpected passes require retiring or revising the expectation; they fail under the default policy. Changed observations, unreviewed celld versions, transport errors, assertion defects, reference failures, and setup/cleanup errors still fail. Existing intentional cache/RPC divergences and the documented secret-key JWK export restriction in `crypto.key-export` retain their separate policy.
 
 ## Maintaining the registry
 
