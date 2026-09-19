@@ -1,6 +1,6 @@
 # Full local qualification
 
-This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 29 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, and `test:capacity` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
+This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 34 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, `test:capacity`, and `test:security` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
 
 All authored TypeScript uses Effect v4 RC.115. New runtime fixtures use the same compatibility date as the API corpus. Fault scenarios assert lifecycle invariants against real celld; they are not labeled as differential workerd tests.
 
@@ -55,6 +55,18 @@ Storage cases use bucket durability so a follower cannot bypass the injected sto
 - `capacity.insufficient-spare`: restrict the two replacement nodes to 8 MiB, verify they cannot remain running (Docker OOM flags are retained separately from exit code 137), remove the remaining node, attempt traffic, then restore capacity and require every acknowledgment to survive. Unavailability is allowed; false success and lost acknowledged data are not.
 
 These are bounded, reproducible load scenarios, not production capacity claims or latency SLOs. History artifacts report p50/p95/max acknowledged response latency and elapsed duration, including driver ledger overhead. Docker limits are local to the owned containers and are raised to a verified 512 MiB before recovery and the owned containers are removed afterward. The pinned Node sidecar adds a network hop; do not compare its timings directly with the older direct-MinIO suites.
+
+## Security boundaries
+
+Five [security-boundary cases](SECURITY-BOUNDARIES.md) verify the listener split, peer authentication, reserved runtime classes, forwarded-header policy, and ingress body limits documented for celld v0.5.0.
+
+- `security.listener-separation`: prove the operator API answers on the internal listener and the application on the public one, then require nine operator and peer paths on the public listener to produce the application's own 404 and three internal paths — including one the application serves publicly — to produce celld's `{"error":"not_found"}`.
+- `security.peer-authentication`: control with a fleet-signed `celld diagnose --peer` probe against every node and an unauthenticated operator cell resolve, then require `401 peer authentication failed` for missing, bearer-token, forged, stale-timestamped, and wrong-target credentials on `/peer/probe`, and for `/runtime/<reserved>` with and without forged credentials on all three nodes.
+- `security.reserved-classes`: control with the unauthenticated ordinary-object route reaching application code, then require the documented 403 and class name for the reserved queue and workflow scopes on `/do/`, and for an ordinary class on `/runtime/`.
+- `security.forwarded-headers`: run one fleet with two policies — the default on two nodes, a trusted proxy on the third, identical fixture throughout — and require forwarded headers to be ignored, last-value applied, malformed forwarded hosts dropped, valid `Host` forms preserved, and malformed or absent hosts replaced with `celld.local`.
+- `security.body-limits`: control with an acknowledged ledger write, require a body exactly at the limit to reach the application and be rejected by it, and require `413 request body too large` for one byte over, four times over, and a chunked body with no declared length.
+
+Each case snapshots ownership, the acknowledged SQL history, its KV mirror, and the durable-object event log around its denials, requires them identical, and then verifies the full ledger. Probes run inside the sidecar container because the peer and operator listener is never published to the host; pure oracles classify every observation and reject transport errors offered as denial evidence. The scenario-specific overlay lowers the ingress body limit, trusts forwarded headers on one node, and joins the deployment tool to the peer network. Peer credential expiry and replay are not testable on this release; see the linked document.
 
 Each scenario has an eight-minute bound and separate artifacts under its ID. The aggregate report and JUnit retain unexecuted placeholders and infrastructure failures. CI runs each group independently. Local Docker results do not qualify AWS, managed Cloudflare delivery guarantees, or host/availability-zone failure domains.
 

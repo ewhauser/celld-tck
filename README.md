@@ -76,13 +76,13 @@ pnpm tck --help
 
 Recovery and fault suites run separately and require Docker:
 
-| Command                   | Coverage                                                   |
-| ------------------------- | ---------------------------------------------------------- |
-| `pnpm test:recovery`      | Process restarts, disk loss, and object-store outages      |
-| `pnpm test:multinode`     | Two-node bucket-durable failover and fencing               |
-| `pnpm test:fleet`         | Fleet-durable follower recovery                            |
-| `pnpm test:resilience`    | Three-node fault scenarios                                 |
-| `pnpm test:qualification` | Traffic, dependency recovery, storage faults, and capacity |
+| Command                   | Coverage                                                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `pnpm test:recovery`      | Process restarts, disk loss, and object-store outages                                                          |
+| `pnpm test:multinode`     | Two-node bucket-durable failover and fencing                                                                   |
+| `pnpm test:fleet`         | Fleet-durable follower recovery                                                                                |
+| `pnpm test:resilience`    | Three-node fault scenarios                                                                                     |
+| `pnpm test:qualification` | Traffic, dependency recovery, storage faults, capacity, and [security boundaries](docs/SECURITY-BOUNDARIES.md) |
 
 The optional `repros` suite contains isolated [upstream bug reproductions](docs/upstream/README.md) and is excluded from the default suite.
 
@@ -108,6 +108,7 @@ Every new case needs a meaningful negative example that its actual checker rejec
 - [Coverage roadmap](docs/ROADMAP.md) and [qualification backlog](docs/BACKLOG.md)
 - [In-place deployment coverage](docs/IN-PLACE-DEPLOYMENT.md)
 - [Assets, dynamic Workers, and facets](docs/EXTENSIONS.md)
+- [Security boundaries](docs/SECURITY-BOUNDARIES.md)
 
 ## License
 
