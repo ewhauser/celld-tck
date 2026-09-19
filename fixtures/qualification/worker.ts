@@ -197,6 +197,18 @@ export class Recovery extends DurableObject<QualificationEnv> {
           );
           if (input.payload.length > 4096 || input.id.length > 128)
             return new Response("too large", { status: 400 });
+          // Holds the request open inside the owning object before it commits,
+          // so a graceful drain can be started while this write is in flight.
+          const delayMs = Number(url.searchParams.get("delay") ?? 0);
+          if (!Number.isInteger(delayMs) || delayMs < 0 || delayMs > 30000)
+            return new Response("invalid delay", { status: 400 });
+          if (delayMs > 0) {
+            // Observation only: records that the object accepted this request
+            // before it began waiting, so a drain can be started afterwards
+            // with evidence rather than with a guess about timing.
+            storage.kv.put(`event:accepted:${input.id}`, Date.now());
+            yield* Effect.sleep(Duration.millis(delayMs));
+          }
           const result = storage.transactionSync(() => {
             storage.sql
               .exec(

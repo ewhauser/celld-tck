@@ -63,6 +63,16 @@ export type LocalOptions = {
        * and `cli` adds the `celld dev` service without enabling telemetry.
        */
       telemetry?: TelemetryMode | undefined;
+      /** Adds the fleet-operations overlay and the in-network probe binary. */
+      operations?: boolean;
+      /** Adds the ownership-balancing overlay. Requires `operations`. */
+      balancing?: boolean;
+      /**
+       * Adds the per-node image overlay so a run can pin a second celld
+       * release. Requires `operations`; `images` seeds the starting pins.
+       */
+      upgrade?: boolean;
+      images?: Readonly<Record<string, string>>;
     }
 );
 
@@ -81,6 +91,12 @@ export const acquireLocal = (options: LocalOptions) =>
         : undefined;
     const security = qualified?.security ?? false;
     const telemetry: TelemetryMode | undefined = qualified?.telemetry;
+    const operations = qualified?.operations ?? false;
+    const balancing = operations && (qualified?.balancing ?? false);
+    const upgrade = operations && (qualified?.upgrade ?? false);
+    // Mutable so a rolling binary upgrade can re-pin one node at a time; the
+    // values are read on every compose invocation, never cached by Compose.
+    const images: Record<string, string> = { ...qualified?.images };
     const wantsDeploymentChecks =
       options.topology === "single" && (options.deploymentChecks ?? false);
     const processes = yield* Processes;
@@ -126,6 +142,9 @@ export const acquireLocal = (options: LocalOptions) =>
         ["telemetry.yaml", telemetry === "otlp"],
         ["telemetry-bucket.yaml", telemetry === "bucket"],
         ["telemetry-cli.yaml", telemetry === "cli"],
+        ["operations.yaml", operations],
+        ["balancing.yaml", balancing],
+        ["upgrade.yaml", upgrade],
         ["manual-reload.yaml", options.manualReload ?? false],
         ["adoption-deadline.yaml", options.adoptionDeadline ?? false],
       ] as const
@@ -145,7 +164,11 @@ export const acquireLocal = (options: LocalOptions) =>
           ...overlays.flatMap((overlay) => ["--file", overlay.path]),
           ...args,
         ],
-        { TCK_FIXTURE_DIR: bundle.directory, TCK_DURABILITY: durability },
+        {
+          TCK_FIXTURE_DIR: bundle.directory,
+          TCK_DURABILITY: durability,
+          ...images,
+        },
       );
     for (const overlay of overlays)
       yield* artifacts.text(
@@ -153,10 +176,12 @@ export const acquireLocal = (options: LocalOptions) =>
         yield* fs.readFileString(overlay.path),
       );
     // Sidecar programs live beside the fixture so the sidecar's read-only bind
-    // mount can reach them; the security probe is built only when needed.
+    // mount can reach them; the in-network probe is built only when needed.
+    // Both the security and the fleet-operations suites drive it: celld's
+    // operator listener is never published outside the Compose network.
     const sidecars = [
       { entry: "./StorageProxy.ts", out: "proxy.mjs" },
-      ...(security
+      ...(security || operations
         ? [{ entry: "./SecurityProbe.ts", out: "security-probe.mjs" }]
         : []),
       ...(telemetry === "otlp"
@@ -542,6 +567,16 @@ export const acquireLocal = (options: LocalOptions) =>
             /** The project directory `celld dev` owns, as the dev service sees it. */
             fixtureDirectory: bundle.directory,
             deploy: () => toolDeploy(compose, "/fixture", { dryRun: false }),
+            /**
+             * Re-pins one node's celld image. Only infra/upgrade.yaml reads
+             * these variables, so this is inert unless that overlay is
+             * selected; the node picks the new image up at its next
+             * `compose up`, which is what a rolling binary upgrade does.
+             */
+            setImage: (node: string, image: string) =>
+              Effect.sync(() => {
+                images[`TCK_IMAGE_${node.toUpperCase()}`] = image;
+              }),
             evict: (node: string, cell: string) =>
               compose([
                 "exec",
