@@ -392,6 +392,228 @@ export const mutations = {
       change(["body", "output", "result"], 0),
     ),
   ],
+  "crypto.ecdsa-p256": [
+    body("ECDSA verifies a tampered signature", "tampered", true),
+    body("ECDSA rejects its own valid signature", "verified", false),
+    mutate(
+      "a JWK-imported public key cannot verify the signature",
+      change(["body", "jwkVerified"], false),
+    ),
+    mutate(
+      "a raw-imported public key cannot verify the signature",
+      change(["body", "rawVerified"], false),
+    ),
+    mutate(
+      "exported public JWK leaks the private scalar",
+      change(["body", "jwk", "privateOmitted"], false),
+    ),
+    mutate(
+      "P-256 coordinates are truncated",
+      change(["body", "jwk", "xBytes"], 31),
+      change(["body", "jwk", "yBytes"], 31),
+    ),
+    mutate(
+      "exported public key carries the sign usage",
+      change(["body", "usages", "public"], ["sign", "verify"]),
+    ),
+    body("signature is not fixed-width P-1363", "signatureBytes", 70),
+  ],
+  "crypto.key-derivation": [
+    body(
+      "PBKDF2 derives the wrong key material",
+      "pbkdf2",
+      "0000000000000000000000000000000000000000000000000000000000000000",
+    ),
+    body(
+      "HKDF ignores the info parameter",
+      "hkdf",
+      "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8",
+    ),
+    body(
+      "deriveKey and deriveBits disagree for the same inputs",
+      "derivedMac",
+      "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8",
+    ),
+    mutate(
+      "derived HMAC key reports the wrong length",
+      change(["body", "derivedAlgorithm", "length"], 128),
+    ),
+    body(
+      "an unaligned HKDF length is silently accepted",
+      "unalignedLength",
+      "accepted",
+    ),
+    body("PBKDF2 accepts zero iterations", "zeroIterations", "accepted"),
+  ],
+  "crypto.key-export": [
+    mutate(
+      "raw secret export returns the wrong key bytes",
+      change(["body", "hmacRaw"], [0, 0, 0]),
+    ),
+    mutate(
+      "JWK export reports the wrong HMAC hash algorithm",
+      change(["body", "hmacJwk", "alg"], "HS512"),
+    ),
+    mutate(
+      "JWK export drops a granted key usage",
+      change(["body", "aesJwk", "keyOps"], ["encrypt"]),
+    ),
+    mutate(
+      "JWK export marks an extractable key as non-extractable",
+      change(["body", "hmacJwk", "ext"], false),
+    ),
+    mutate(
+      "a JWK-imported AES key holds different bytes",
+      change(
+        ["body", "jwkImported"],
+        [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+      ),
+    ),
+    mutate(
+      "imported key reports the wrong bit length",
+      change(["body", "algorithms", 1, "length"], 256),
+    ),
+  ],
+  "crypto.invalid-input": [
+    body(
+      "signing with a verify-only key is accepted",
+      "wrongUsage",
+      "accepted",
+    ),
+    body(
+      "an unsupported algorithm name is accepted",
+      "unknownAlgorithm",
+      "accepted",
+    ),
+    body("an unsupported digest name is accepted", "unknownHash", "accepted"),
+    body("an invalid AES key length is accepted", "badKeyLength", "accepted"),
+    body("a malformed JWK is accepted", "malformedJwk", "DataCloneError"),
+    body("an empty usage list is accepted", "emptyUsages", "accepted"),
+    body(
+      "usages inconsistent with the algorithm are accepted",
+      "mismatchedUsage",
+      "accepted",
+    ),
+    body("a non-extractable key can be exported", "nonExtractable", "accepted"),
+    body("AES-GCM accepts an empty IV", "emptyIv", "accepted"),
+  ],
+  "messaging.message-channel": [
+    mutate(
+      "MessagePort delivers messages out of order",
+      change(["body", "messages", "value", 0], {
+        type: "Array",
+        value: [{ type: "number", value: 3 }, { type: "null" }],
+      }),
+      change(["body", "messages", "value", 2], {
+        type: "string",
+        value: "first",
+      }),
+    ),
+    mutate(
+      "structured clone downgrades a Set to an array",
+      change(["body", "messages", "value", 1, "value", 2, 1], {
+        type: "Array",
+        value: [{ type: "string", value: "a" }],
+      }),
+    ),
+    mutate(
+      "structured clone corrupts typed-array bytes",
+      change(["body", "messages", "value", 1, "value", 0, 1], {
+        type: "Uint8Array",
+        value: [0, 0],
+      }),
+    ),
+    body("a message is delivered synchronously", "synchronous", 1),
+    body("an unserializable message is accepted", "unserializable", "accepted"),
+    body(
+      "a message arrives after the receiving port closed",
+      "droppedAfterClose",
+      false,
+    ),
+  ],
+  "messaging.event-source": [
+    mutate(
+      "a named server-sent event is delivered as a default message",
+      change(["body", "events", 0, "type"], "message"),
+    ),
+    mutate(
+      "multi-line data fields are not joined with newlines",
+      change(["body", "events", 1, "data"], "line one line two"),
+    ),
+    mutate(
+      "the last event id does not persist across events",
+      change(["body", "events", 1, "lastEventId"], ""),
+    ),
+    mutate(
+      "UTF-8 event data is corrupted",
+      change(["body", "events", 0, "data"], "hello ?"),
+    ),
+    body("an exhausted stream stays open", "exhausted", 1),
+    body("the stream ends without an error event", "trace", []),
+  ],
+  "node.util": [
+    body("promisify drops the callback result", "promisified", "value:"),
+    body("promisify swallows a callback error", "promisifiedError", "accepted"),
+    body(
+      "inspect renders nested arrays as [Object]",
+      "inspect",
+      "{ a: 1, b: [Object], c: 'λ' }",
+    ),
+    body(
+      "inspect ignores the default depth limit",
+      "inspectDepth",
+      "{ a: { b: { c: { d: 1 } } } }",
+    ),
+    body("format ignores the %j specifier", "format", "x:2:%j"),
+    mutate(
+      "util.types misidentifies a plain object as a Date",
+      change(["body", "types", "notDate"], true),
+    ),
+    mutate(
+      "isDeepStrictEqual ignores value types",
+      change(["body", "deepEqual", 1], true),
+    ),
+  ],
+  "node.assert": [
+    body("a satisfied assertion still throws", "satisfied", {
+      name: "AssertionError",
+    }),
+    mutate(
+      "AssertionError loses its error code",
+      change(["body", "strictEqual", "code"], "ERR_INVALID_ARG_TYPE"),
+    ),
+    mutate(
+      "AssertionError reports the wrong operator",
+      change(["body", "deepStrictEqual", "operator"], "notDeepStrictEqual"),
+    ),
+    mutate(
+      "AssertionError loses the compared values",
+      change(["body", "strictEqual", "actual"], null),
+      change(["body", "strictEqual", "expected"], null),
+    ),
+    mutate(
+      "deepStrictEqual stops distinguishing value types",
+      change(["body", "typeSensitive"], "accepted"),
+    ),
+    body(
+      "assert.throws accepts a body that never throws",
+      "throwsMissing",
+      "accepted",
+    ),
+    body(
+      "assert.rejects accepts a fulfilled promise",
+      "resolvedNotRejected",
+      "accepted",
+    ),
+  ],
+  "node.stream-timers": [
+    body("Readable.toWeb corrupts object-mode chunks", "chunks", ["a", "?"]),
+    body("Readable.toWeb concatenates object-mode chunks", "chunks", ["aλ"]),
+    body("Readable.toWeb drops binary chunks", "binary", [0, 128]),
+    body("Readable.fromWeb corrupts UTF-8 text", "fromWeb", "a?"),
+    body("timers/promises resolves the longer sleep first", "race", "slow"),
+    body("an aborted sleep resolves instead of rejecting", "aborted", "never"),
+  ],
   "node.buffer": [
     body("Buffer encoding truncates non-ASCII bytes", "hex", "3f3f"),
     body("Buffer slice uses the wrong bounds", "slice", [187, 240]),
