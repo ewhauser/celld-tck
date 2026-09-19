@@ -105,7 +105,8 @@ Every new case needs a meaningful negative example that its actual checker rejec
 - [Resilience](docs/RESILIENCE.md) and [qualification scenarios](docs/QUALIFICATION.md)
 - [Storage durability barriers, cursors, and deadlines](docs/STORAGE-DURABILITY.md)
 - [Dashboard publishing and local previews](docs/DASHBOARD.md)
-- [Remaining work](docs/BACKLOG.md)
+- [Coverage roadmap](docs/ROADMAP.md) and [qualification backlog](docs/BACKLOG.md)
+- [In-place deployment coverage](docs/IN-PLACE-DEPLOYMENT.md)
 
 ## License
 

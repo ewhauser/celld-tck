@@ -1,3 +1,4 @@
+import { Processes } from "./Processes.js";
 import { Effect, type FileSystem } from "effect";
 import { Artifacts, artifactsLayer } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
@@ -15,6 +16,7 @@ import { dependencyCases } from "./QualificationDependencies.js";
 import { faultCases } from "./QualificationFaults.js";
 import { capacityCases } from "./QualificationCapacity.js";
 interface QualificationCase {
+  readonly manualReload: boolean;
   readonly id: string;
   readonly durability: "bucket" | "fleet";
   readonly run: (
@@ -22,7 +24,7 @@ interface QualificationCase {
   ) => Effect.Effect<
     unknown,
     unknown,
-    FileSystem.FileSystem | Artifacts | Transport
+    FileSystem.FileSystem | Artifacts | Transport | Processes
   >;
 }
 export const qualificationCases = [
@@ -31,6 +33,7 @@ export const qualificationCases = [
   ...faultCases,
   ...capacityCases,
 ].map((test) => ({
+  manualReload: false,
   durability: "fleet" as const,
   ...test,
 })) satisfies readonly QualificationCase[];
@@ -94,6 +97,7 @@ export const runQualification = (options: {
                 durability: scenario.durability,
                 nodeCount: 3,
                 qualification: true,
+                manualReload: scenario.manualReload,
               });
               environment.candidates.push(runtime.metadata);
               const ctx = yield* makeContext(

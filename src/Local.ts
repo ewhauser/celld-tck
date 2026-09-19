@@ -31,6 +31,7 @@ const Container = Schema.Struct({
 });
 
 export type LocalOptions = {
+  manualReload?: boolean;
   runId: string;
   bundle: Bundle;
   cleanupError: (detail: string) => Effect.Effect<void>;
@@ -103,6 +104,7 @@ export const acquireLocal = (options: LocalOptions) =>
         ["fleet.yaml", durability === "fleet"],
         ["three-node.yaml", multiNode && nodeCount === 3],
         ["qualification.yaml", qualification],
+        ["manual-reload.yaml", options.manualReload ?? false],
       ] as const
     )
       .filter(([, enabled]) => enabled)
