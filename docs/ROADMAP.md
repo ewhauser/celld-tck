@@ -85,11 +85,13 @@ The Web Crypto and messaging work registered one documented divergence (`crypto.
 
 ## 6. Fleet operations and binary upgrades
 
-- [ ] Verify weighted ownership placement, rebalance pause/resume, and behavior when capacity samples are missing or stale.
-- [ ] Assert readiness transitions, completion of accepted requests, and handoff behavior during graceful drain.
-- [ ] Exercise concurrent drains and bounded shutdown when survivors lack capacity.
-- [ ] Validate same-node preserve/reload behavior if supported by the selected release.
-- [ ] Run mixed-version and rolling binary upgrades with two explicitly pinned releases; assert data preservation and documented compatibility or rejection behavior.
+- [x] Verify weighted ownership placement, rebalance pause/resume, and behavior when capacity samples are missing or stale. Placement weights, pause/resume, and a missing sample are covered. A _stale_ sample distinct from a missing one is not reachable on v0.5.0: the only way to stop a node publishing samples is to stop the process, and a process that cannot renew its lease fences itself.
+- [x] Assert readiness transitions, completion of accepted requests, and handoff behavior during graceful drain.
+- [x] Exercise concurrent drains and bounded shutdown when survivors lack capacity.
+- [x] Validate same-node preserve/reload behavior if supported by the selected release. `POST /shutdown?handoff=preserve` is supported and covered.
+- [x] Run mixed-version and rolling binary upgrades with two explicitly pinned releases; assert data preservation and documented compatibility or rejection behavior. v0.4.1 and v0.5.0 are both pinned by digest; v0.5.0 names no upgrade exception between them, so the documented rolling update is what the case runs. Downgrades are not attempted.
+
+Implemented coverage, the v0.5.0 operational-control inventory it rests on, and the untestable items are in [FLEET-OPERATIONS.md](FLEET-OPERATIONS.md).
 
 Use multiple cells and retain ownership, readiness, and acknowledged-write evidence. Existing failover tests are a foundation, not proof of every operational control.
 

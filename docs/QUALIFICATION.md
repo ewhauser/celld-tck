@@ -1,6 +1,7 @@
 # Full local qualification
 
 This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 45 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, `test:capacity`, and `test:security` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
+This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 40 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, `test:capacity`, `test:security`, and `test:operations` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
 
 All authored TypeScript uses Effect v4 RC.115. New runtime fixtures use the same compatibility date as the API corpus. Fault scenarios assert lifecycle invariants against real celld; they are not labeled as differential workerd tests.
 
@@ -89,6 +90,42 @@ Five [CLI and telemetry cases](CLI-TELEMETRY.md) cover the `celld` command line 
 
 The OTLP cases assert on payloads a recording collector sidecar decoded, never on celld's own log output. Each delivery is digested, so a repeated digest is what proves a retry. Only the Parquet footer is read, so column values, retention, and the bounded telemetry queue stay unasserted; the linked document records why.
 
+## Fleet operations
+Six [fleet-operations cases](FLEET-OPERATIONS.md) exercise the operational
+controls documented for celld v0.5.0, plus a rolling binary upgrade from the
+second explicitly pinned release, v0.4.1.
+- `operations.weighted-placement`: require every node to publish its configured
+  `CELLD_PLACEMENT_WEIGHT` through both `/state` and its bucket lease, create
+  25 cells through one node, and require balancing to settle with no node two
+  whole cells above its weighted target.
+- `operations.rebalance-control`: pause balancing on one node, prove the pause
+  is republished in its lease, and require no ownership record and no
+  `rebalanced` counter to move across ten sample intervals while another node is
+  far above its target; resume and require convergence. Then freeze a node past
+  its lease lifetime and require the live pair to keep balancing while the node
+  without a capacity sample acquires nothing.
+- `operations.graceful-drain`: hold a write open inside its owning object,
+  drain the node through `POST /shutdown` while it is in flight, and require the
+  accepted write to complete with its own receipt, a new public request to be
+  refused with 503, readiness to fall once and never rise, an exit 0 inside the
+  stop bound, every cell to be owned by a peer, and the node's own log to record
+  each handoff.
+- `operations.concurrent-drain`: drain two nodes at once into a survivor held at
+  a verified 128 MiB; require both to stop inside the bound with disjoint
+  drain-token holds and to give every cell away.
+- `operations.preserve-reload`: ask one node for a same-node preserve and
+  require it to log a prepared clean reload, no handoff at all, and ownership
+  records that are byte-identical across the stop and the restart.
+- `operations.binary-upgrade`: start the fleet on the pinned v0.4.1 image and
+  roll each node to the pinned v0.5.0 image one at a time, requiring a genuinely
+  mixed fleet at each step, an acknowledged write on every cell through every
+  live node while it is mixed, and every acknowledged write intact at the end.
+Each case holds several cells, each with its own durable ledger, and ends by
+requiring every acknowledged write of every cell through every node. Operator
+calls run from the sidecar container because the operator listener is never
+published to the host. The scenario-specific overlays set distinct placement
+weights and a short stop bound, enable balancing and idle eviction for the two
+balancing cases, and pin a second release per node for the upgrade case.
 Each scenario has an eight-minute bound and separate artifacts under its ID. The aggregate report and JUnit retain unexecuted placeholders and infrastructure failures. CI runs each group independently. Local Docker results do not qualify AWS, managed Cloudflare delivery guarantees, or host/availability-zone failure domains.
 
 References: [Cloudflare queue APIs](https://developers.cloudflare.com/queues/configuration/javascript-apis/), [workflow sleeping and retrying](https://developers.cloudflare.com/workflows/build/sleeping-and-retrying/), and [Durable Object WebSocket hibernation](https://developers.cloudflare.com/durable-objects/best-practices/websockets/).

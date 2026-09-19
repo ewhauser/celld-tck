@@ -76,13 +76,13 @@ pnpm tck --help
 
 Recovery and fault suites run separately and require Docker:
 
-| Command                   | Coverage                                                                                                       |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `pnpm test:recovery`      | Process restarts, disk loss, and object-store outages                                                          |
-| `pnpm test:multinode`     | Two-node bucket-durable failover and fencing                                                                   |
-| `pnpm test:fleet`         | Fleet-durable follower recovery                                                                                |
-| `pnpm test:resilience`    | Three-node fault scenarios                                                                                     |
-| `pnpm test:qualification` | Traffic, dependency recovery, storage faults, capacity, and [security boundaries](docs/SECURITY-BOUNDARIES.md) |
+| Command                   | Coverage                                                                                                                                                     |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm test:recovery`      | Process restarts, disk loss, and object-store outages                                                                                                        |
+| `pnpm test:multinode`     | Two-node bucket-durable failover and fencing                                                                                                                 |
+| `pnpm test:fleet`         | Fleet-durable follower recovery                                                                                                                              |
+| `pnpm test:resilience`    | Three-node fault scenarios                                                                                                                                   |
+| `pnpm test:qualification` | Traffic, dependency recovery, storage faults, capacity, [security boundaries](docs/SECURITY-BOUNDARIES.md), and [fleet operations](docs/FLEET-OPERATIONS.md) |
 
 The optional `repros` suite contains isolated [upstream bug reproductions](docs/upstream/README.md) and is excluded from the default suite.
 

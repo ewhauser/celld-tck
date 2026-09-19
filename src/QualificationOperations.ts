@@ -12,7 +12,7 @@ import { Effect, Fiber, Schema } from "effect";
 import { decodeAs, decodeJson } from "./Artifacts.js";
 import { leaseLapse } from "./Domain.js";
 import { NodeLoad, type Node } from "./FleetControls.js";
-import { pollUntil } from "./Polling.js";
+import { pollUntil, waitForReady } from "./Polling.js";
 import { equal } from "./Oracle.js";
 import {
   makeContext,
@@ -244,6 +244,36 @@ const refresh = (
     for (const member of members) member.targets[node] = target;
   });
 
+/**
+ * Brings stopped nodes back and waits for the documented first-readiness gate.
+ *
+ * Every node is started before any of them is waited on, because the gate is a
+ * fleet condition: a replacement holds its first healthy response until the
+ * fleet is settled, and a fleet that is still missing a node can keep it
+ * closed. The wait covers the whole 60-second gate infra/operations.yaml pins,
+ * which is longer than the context's ordinary readiness budget.
+ */
+const restart = (
+  ctx: QualificationContext,
+  members: readonly Cell[],
+  stopped: readonly Node[],
+) =>
+  Effect.gen(function* () {
+    for (const node of stopped) yield* ctx.fleet.start(node);
+    for (const node of stopped) yield* refresh(ctx, members, node);
+    yield* Effect.forEach(
+      stopped,
+      (node) =>
+        waitForReady(
+          ctx.transport.request(ctx.targets[node], {
+            path: "/.well-known/celld/health",
+          }),
+          { interval: "1 second", attempts: 150, timeout: "150 seconds" },
+        ),
+      { discard: true },
+    );
+  });
+
 /** The acknowledged ids of one cell, read back from its persisted ledger. */
 const acknowledgedIds = (cell: Cell) =>
   cell.ledger
@@ -435,8 +465,7 @@ const rebalanceControl = (ctx: QualificationContext) =>
     yield* fleet.unpause("celld3");
     yield* fleet.fenced("celld3");
     yield* leaseLapse;
-    yield* ctx.start("celld3");
-    yield* refresh(ctx, members, "celld3");
+    yield* restart(ctx, members, ["celld3"]);
     yield* verifyAll(members, nodes);
     return {
       pausedDistribution: ownedCells(during),
@@ -579,8 +608,7 @@ const gracefulDrain = (ctx: QualificationContext) =>
       yield* checkDrainedAway(donor, before, after);
       yield* checkHandoffEvidence(donor, evidence, drained.map(scope));
 
-      yield* ctx.start(donor);
-      yield* refresh(ctx, members, donor);
+      yield* restart(ctx, members, [donor]);
       yield* verifyAll(members, nodes);
       return {
         donor,
@@ -672,8 +700,7 @@ const concurrentDrain = (ctx: QualificationContext) =>
 
     // Limits are restored by the scoped finalizer above; the survivors get
     // their ordinary budget back before recovery is required.
-    for (const node of donors) yield* ctx.start(node);
-    for (const node of donors) yield* refresh(ctx, members, node);
+    yield* restart(ctx, members, donors);
     yield* artifacts.json("concurrent-drain.json", {
       donors,
       survivor,
@@ -738,8 +765,7 @@ const preserveReload = (ctx: QualificationContext) =>
     yield* equal(evidence.handoffs.length, 0);
     yield* equal(evidence.cleanReload, "prepared");
 
-    yield* ctx.start(node);
-    yield* refresh(ctx, members, node);
+    yield* restart(ctx, members, [node]);
     const restarted = yield* fleet.ownership();
     yield* checkOwnershipPreserved(node, before, restarted);
     yield* artifacts.json("preserve-reload.json", {
@@ -806,7 +832,12 @@ const binaryUpgrade = (ctx: QualificationContext) =>
       // before the rollout moves on, which is the documented rolling update.
       yield* fleet.recreate(node);
       yield* refresh(ctx, members, node);
-      yield* ctx.ready(node);
+      yield* waitForReady(
+        ctx.transport.request(ctx.targets[node], {
+          path: "/.well-known/celld/health",
+        }),
+        { interval: "1 second", attempts: 150, timeout: "150 seconds" },
+      );
       const image = (yield* fleet.inspect(node)).Config.Image;
       yield* equal(image, CURRENT_IMAGE);
 
