@@ -136,7 +136,9 @@ export const boundaries = (request: Request, env: Env, name: string) =>
             env.BUCKET.put(name + suffix, body, {
               httpMetadata: {
                 contentType: "text/plain; charset=utf-8",
-                contentDisposition: 'attachment; filename="λ.txt"',
+                // HTTP metadata stays ASCII: it is echoed into response
+                // headers, and the non-ASCII case belongs in customMetadata.
+                contentDisposition: 'attachment; filename="report.txt"',
                 cacheControl: "max-age=42",
               },
               customMetadata: { label: "λ" },
