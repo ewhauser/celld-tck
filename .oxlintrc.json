@@ -26,6 +26,7 @@
       "files": [
         "fixtures/**/worker.ts",
         "fixtures/extensions/child.ts",
+        "fixtures/recovery/child.ts",
         "fixtures/core/Services.ts",
         "fixtures/core/Storage.ts"
       ],
