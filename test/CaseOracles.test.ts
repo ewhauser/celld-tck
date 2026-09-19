@@ -173,6 +173,10 @@ const knownBugMutations: Record<string, Mutation> = {
     name: "an unrelated error replaces the known error",
     changes: [{ path: ["body", "limit"], value: "RangeError" }],
   },
+  "assets.html-routing": {
+    name: "the canonical redirect is also lost",
+    changes: [{ path: ["body", "folder", "location"], value: null }],
+  },
   "repro.body-readers": {
     name: "fresh body is already marked used",
     changes: [{ path: ["body", 0, "before"], value: true }],

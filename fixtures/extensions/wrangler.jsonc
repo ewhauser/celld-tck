@@ -36,6 +36,11 @@
       "service": "celld-tck-core",
       "entrypoint": "Service",
     },
+    {
+      "binding": "GATEWAY",
+      "service": "celld-tck-core",
+      "entrypoint": "Gateway",
+    },
   ],
   "queues": {
     "producers": [

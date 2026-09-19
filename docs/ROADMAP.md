@@ -58,11 +58,13 @@ Each denial case needs an authorized control and an assertion that no protected 
 
 ## 4. Deepen existing extension coverage
 
-- [ ] **Assets:** asset-only deployments, HTML/not-found routing, redirects, worker-first rules, and header restrictions. Extend the existing binding fetch/header/404 case.
-- [ ] **Dynamic Workers:** props, service capabilities in bindings, outbound restrictions, generation lifecycle, and documented limits. Extend the existing fetch case.
-- [ ] **Facets:** explicit transaction commit/rollback, persistence after eviction/restart, root replication, and outbound-effect restrictions during uncommitted transactions. Extend the existing counter-isolation case.
+- [ ] **Assets:** asset-only deployments, HTML/not-found routing, redirects, worker-first rules, and header restrictions. `assets.html-routing` and `assets.redirects` now cover default HTML handling, the not-found response, `_redirects` rules, and a `_headers` rule on an HTML asset; asset-only deployments, worker-first routing rules, and `_headers` protocol-header restrictions remain open.
+- [ ] **Dynamic Workers:** props, service capabilities in bindings, outbound restrictions, generation lifecycle, and documented limits. `dynamic.props`, `dynamic.bindings`, and `dynamic.outbound` now cover per-call props, structured-clone and Service Binding values in `WorkerCode.env`, and both `globalOutbound: null` and a `globalOutbound` gateway; generation lifecycle and the documented process/size limits remain open.
+- [ ] **Facets:** explicit transaction commit/rollback, persistence after eviction/restart, root replication, and outbound-effect restrictions during uncommitted transactions. `facets.transaction` now covers explicit commit and rollback; persistence, root replication, and the outbound restriction during an uncommitted root transaction remain open.
 
 Use identical fixtures for shared APIs. Validate documented celld differences explicitly rather than weakening the reference expectation.
+
+Implemented coverage and limits are in [EXTENSIONS.md](EXTENSIONS.md).
 
 ## 5. Runtime and service breadth
 
