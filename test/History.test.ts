@@ -5,6 +5,8 @@ import { artifactsLayer } from "../src/Artifacts.js";
 import {
   checkHistory,
   readHistory,
+  checkFencedReceipts,
+  checkHistoryKv,
   makeLedger,
   type LedgerEvent,
 } from "../src/History.js";
@@ -87,7 +89,6 @@ it.effect(
     }).pipe(Effect.provide(NodeServices.layer)),
 );
 
-import { checkFencedReceipts } from "../src/History.js";
 it.effect(
   "a resumed old activation cannot acknowledge after takeover even if data happens to survive",
   () =>
@@ -105,7 +106,6 @@ it.effect(
     }),
 );
 
-import { checkHistoryKv } from "../src/History.js";
 it.effect(
   "history KV scan rejects orphaned, missing, duplicate and corrupt keys",
   () =>

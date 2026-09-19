@@ -1,12 +1,7 @@
 import type { Report } from "./Domain.js";
+import { escapeMarkup } from "./Escape.js";
 
-const xml = (value: string) =>
-  value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
+const xml = (value: string) => escapeMarkup(value, "&apos;");
 export const junit = (report: Report): string => {
   const failures = report.cases.filter(
     (result) => result.status === "fail",

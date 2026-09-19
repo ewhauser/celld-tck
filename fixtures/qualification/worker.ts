@@ -7,8 +7,7 @@ import {
 } from "cloudflare:workers";
 import { Effect, Schema } from "effect";
 import { durabilityOperation } from "./Durability.js";
-const platform = <A>(f: () => PromiseLike<A>) =>
-  Effect.tryPromise({ try: () => Promise.resolve(f()), catch: (e) => e });
+import { platform, ready } from "../shared/Platform.js";
 const blob = (id: number) => {
   const bytes = new Uint8Array(65536);
   let state = id + 1;
@@ -77,7 +76,7 @@ export class Recovery extends DurableObject<QualificationEnv> {
           void this.durabilityCursor;
           return durability;
         }
-        if (url.pathname === "/ready") return Response.json({ ready: true });
+        if (url.pathname === "/ready") return ready();
         if (url.pathname === "/fleet/id")
           return Response.json({
             cell: this.ctx.id.toString(),
