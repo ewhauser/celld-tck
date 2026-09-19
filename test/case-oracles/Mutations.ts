@@ -808,6 +808,19 @@ export const mutations = {
 } satisfies Record<string, readonly [Mutation, ...Mutation[]]>;
 
 export const divergenceMutations = {
+  "crypto.key-export": [
+    mutate(
+      "the documented jwk restriction is extended to raw secret export",
+      change(["body", "hmacRaw"], "NotSupportedError"),
+    ),
+    mutate(
+      "raw secret export returns the wrong key bytes under the waiver",
+      change(
+        ["body", "aesRaw"],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      ),
+    ),
+  ],
   "cache.documented-miss": [
     body("always-miss cache invents a hit", "value", "invented"),
   ],

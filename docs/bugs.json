@@ -35,12 +35,32 @@
       "owner": "celld-tck maintainers",
       "reviewedAt": "2026-09-18",
       "upstreamIssue": null
+    },
+    {
+      "id": "CELL-004",
+      "title": "EC public key export returns SPKI for the raw format and omits JWK metadata",
+      "status": "open",
+      "report": "upstream/webcrypto-ec-key-export.md",
+      "owner": "celld-tck maintainers",
+      "reviewedAt": "2026-09-18",
+      "upstreamIssue": null
+    },
+    {
+      "id": "CELL-005",
+      "title": "SubtleCrypto does not enforce key usages or key lengths and misclassifies malformed JWK input",
+      "status": "open",
+      "report": "upstream/webcrypto-input-validation.md",
+      "owner": "celld-tck maintainers",
+      "reviewedAt": "2026-09-18",
+      "upstreamIssue": null
     }
   ],
   "expectations": [
     {
       "caseId": "http.body-consumption",
-      "bugIds": ["CELL-001"],
+      "bugIds": [
+        "CELL-001"
+      ],
       "celldVersion": "0.5.0",
       "evidenceRun": "tck-7c8c6cf9-b2f3-4d2d-b2c0-8c21b7fbca7d",
       "candidate": {
@@ -62,7 +82,10 @@
     },
     {
       "caseId": "storage.invalid-input",
-      "bugIds": ["CELL-002", "CELL-003"],
+      "bugIds": [
+        "CELL-002",
+        "CELL-003"
+      ],
       "celldVersion": "0.5.0",
       "evidenceRun": "tck-7c8c6cf9-b2f3-4d2d-b2c0-8c21b7fbca7d",
       "candidate": {
@@ -80,7 +103,9 @@
     },
     {
       "caseId": "repro.body-readers",
-      "bugIds": ["CELL-001"],
+      "bugIds": [
+        "CELL-001"
+      ],
       "celldVersion": "0.5.0",
       "evidenceRun": "tck-fdff5d81-b4bf-45b9-a651-debe3808879d",
       "candidate": {
@@ -220,7 +245,10 @@
     },
     {
       "caseId": "repro.storage-errors",
-      "bugIds": ["CELL-002", "CELL-003"],
+      "bugIds": [
+        "CELL-002",
+        "CELL-003"
+      ],
       "celldVersion": "0.5.0",
       "evidenceRun": "tck-fdff5d81-b4bf-45b9-a651-debe3808879d",
       "candidate": {
@@ -263,7 +291,9 @@
     },
     {
       "caseId": "assets.html-routing",
-      "bugIds": ["CELL-004"],
+      "bugIds": [
+        "CELL-004"
+      ],
       "celldVersion": "0.5.0",
       "evidenceRun": "tck-61e8bd92-7c94-40b3-a868-a9fa40881eec",
       "candidate": {
@@ -307,6 +337,83 @@
             "contentType": null,
             "body": null
           }
+        }
+      },
+      "compatibilityDate": "2026-07-30",
+      "compatibilityFlags": []
+    },
+    {
+      "caseId": "crypto.ecdsa-p256",
+      "bugIds": [
+        "CELL-004"
+      ],
+      "celldVersion": "0.5.0",
+      "evidenceRun": "tck-0c3c37cf-d018-4e54-b741-aeec138d7628",
+      "candidate": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "signatureBytes": 64,
+          "verified": true,
+          "tampered": false,
+          "jwkVerified": true,
+          "rawVerified": "NotSupportedError",
+          "jwk": {
+            "kty": "EC",
+            "crv": "P-256",
+            "xBytes": 32,
+            "yBytes": 32,
+            "privateOmitted": true
+          },
+          "raw": {
+            "bytes": 91,
+            "uncompressed": false
+          },
+          "usages": {
+            "private": [
+              "sign"
+            ],
+            "public": [
+              "verify"
+            ]
+          },
+          "algorithm": {
+            "name": "ECDSA",
+            "namedCurve": "P-256"
+          },
+          "types": [
+            "private",
+            "public"
+          ]
+        }
+      },
+      "compatibilityDate": "2026-07-30",
+      "compatibilityFlags": []
+    },
+    {
+      "caseId": "crypto.invalid-input",
+      "bugIds": [
+        "CELL-005"
+      ],
+      "celldVersion": "0.5.0",
+      "evidenceRun": "tck-0c3c37cf-d018-4e54-b741-aeec138d7628",
+      "candidate": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "wrongUsage": "accepted",
+          "unknownAlgorithm": "NotSupportedError",
+          "unknownHash": "NotSupportedError",
+          "badKeyLength": "accepted",
+          "malformedJwk": "Error",
+          "emptyUsages": "accepted",
+          "mismatchedUsage": "accepted",
+          "nonExtractable": "InvalidAccessError",
+          "emptyIv": "OperationError"
         }
       },
       "compatibilityDate": "2026-07-30",

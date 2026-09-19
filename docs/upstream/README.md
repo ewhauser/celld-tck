@@ -2,11 +2,15 @@
 
 Investigated September 18, 2026. These are **drafts, not submitted issues or validated fixes**.
 
-The two original failing TCK cases reduce to three independently actionable reports:
+The two original failing TCK cases reduce to three independently actionable reports; two further Web Crypto reports were added later:
 
 1. [Body readers permit repeated consumption](body-consumption.md).
 2. [Invalid storage list limits throw the wrong error class](storage-list-validation.md).
 3. [Uncloneable storage values throw TypeError instead of DataCloneError](storage-clone-errors.md).
+4. [EC public key export returns SPKI for the raw format and omits JWK metadata](webcrypto-ec-key-export.md).
+5. [SubtleCrypto does not enforce key usages or key lengths](webcrypto-input-validation.md).
+
+Reports 4 and 5 were found by the Web Crypto cases in the regular `core` suite, not by the isolated `repros` fixture; reproduce them with `pnpm tck --profile local --suite core --case crypto.ecdsa-p256` and `--case crypto.invalid-input`, evidence run `tck-0c3c37cf-d018-4e54-b741-aeec138d7628`. Their source investigation is not pinned to an upstream commit.
 
 A later report came from the extensions suite rather than the repro fixture:
 

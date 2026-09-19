@@ -264,33 +264,59 @@ export const coreCases: ReadonlyArray<TestCase> = [
     },
     cryptoDoc,
   ),
-  endpoint(
-    "crypto.key-export",
-    "/web/key-export",
-    {
-      hmacRaw: [107, 101, 121],
-      aesRaw: Array.from({ length: 16 }, (_, i) => i),
-      hmacJwk: {
-        kty: "oct",
-        alg: "HS256",
-        keyOps: ["sign", "verify"],
-        ext: true,
-        k: "a2V5",
+  {
+    ...endpoint(
+      "crypto.key-export",
+      "/web/key-export",
+      {
+        hmacRaw: [107, 101, 121],
+        aesRaw: Array.from({ length: 16 }, (_, i) => i),
+        hmacJwk: {
+          kty: "oct",
+          alg: "HS256",
+          keyOps: ["sign", "verify"],
+          ext: true,
+          k: "a2V5",
+        },
+        aesJwk: {
+          kty: "oct",
+          alg: "A128GCM",
+          keyOps: ["encrypt", "decrypt"],
+          ext: true,
+          k: "AAECAwQFBgcICQoLDA0ODw",
+        },
+        algorithms: [
+          { name: "HMAC", hash: { name: "SHA-256" }, length: 24 },
+          { name: "AES-GCM", length: 128 },
+        ],
       },
-      aesJwk: {
-        kty: "oct",
-        alg: "A128GCM",
-        keyOps: ["encrypt", "decrypt"],
-        ext: true,
-        k: "AAECAwQFBgcICQoLDA0ODw",
-      },
-      algorithms: [
-        { name: "HMAC", hash: { name: "SHA-256" }, length: 24 },
-        { name: "AES-GCM", length: 128 },
-      ],
+      cryptoDoc,
+    ),
+    divergence: {
+      celldVersion: "0.5.0",
+      compatibilityDate: "2026-07-30",
+      compatibilityFlags: [],
+      source: "https://celld.dev/docs/cloudflare-compat/#web-crypto",
+      reason:
+        "celld documents that a secret key cannot use jwk with exportKey() or wrapKey()",
+      reviewDate: "2026-09-18",
+      owner: "celld-tck maintainers",
+      check: (value) =>
+        equal(
+          value,
+          response({
+            hmacRaw: [107, 101, 121],
+            aesRaw: Array.from({ length: 16 }, (_, i) => i),
+            hmacJwk: "NotSupportedError",
+            aesJwk: "NotSupportedError",
+            algorithms: [
+              { name: "HMAC", hash: { name: "SHA-256" }, length: 24 },
+              { name: "AES-GCM", length: 128 },
+            ],
+          }),
+        ),
     },
-    cryptoDoc,
-  ),
+  },
   endpoint(
     "crypto.invalid-input",
     "/web/crypto-invalid",
