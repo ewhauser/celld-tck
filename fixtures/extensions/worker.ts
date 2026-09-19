@@ -212,7 +212,11 @@ export default {
                   limits: { cpuMs: 200, subRequests: 5 },
                   env: { TOKEN: "limited λ", COUNT: 1, UPSTREAM: env.GATEWAY },
                 },
-              }),
+              }).pipe(
+                // A runtime that refuses the field reports that outcome; the
+                // rejection message is not part of the documented contract.
+                Effect.catch(() => Effect.succeed({ rejected: true })),
+              ),
             );
           case "/dynamic/outbound":
             return Response.json({

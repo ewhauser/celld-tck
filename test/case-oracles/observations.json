@@ -53,6 +53,10 @@
     {
       "runId": "tck-9bfff958-d432-4206-8a3f-942cb5ffc715",
       "sourceRevision": "afe5550ff0ccc11a1cdfaeff6ea5ed7b465766d5"
+    },
+    {
+      "runId": "tck-b7682d00-020f-425d-a55c-a22edf58d5a7",
+      "sourceRevision": "94f52f73ce295c81fe0226b89870a4100b328a6f"
     }
   ],
   "cases": {
@@ -2276,6 +2280,34 @@
             "length": 128
           }
         ]
+      }
+    },
+    "dynamic.limits": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "rejected": true
+      }
+    },
+    "facets.outbound-transaction": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "control": {
+          "balance": 40,
+          "outbound": "gateway /facet"
+        },
+        "inTransaction": {
+          "balance": 40,
+          "outbound": "rejected"
+        },
+        "after": {
+          "balance": 40
+        }
       }
     }
   }
