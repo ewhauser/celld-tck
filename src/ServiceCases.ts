@@ -136,7 +136,7 @@ export const serviceCases: ReadonlyArray<TestCase> = [
       },
       written: {
         type: "text/plain; charset=utf-8",
-        disposition: 'attachment; filename="λ.txt"',
+        disposition: 'attachment; filename="report.txt"',
         cache: "max-age=42",
       },
     },
