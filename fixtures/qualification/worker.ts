@@ -257,6 +257,8 @@ export default {
     return Effect.runPromise(
       Effect.gen(function* () {
         const url = new URL(request.url);
+        if (url.pathname === "/deployment/revision")
+          return Response.json({ revision: "qualification-v1" });
         // Worker-local: a Durable Object request may execute on another node.
         if (url.pathname === "/pressure") {
           const mb = Number(url.searchParams.get("mb") ?? 16);

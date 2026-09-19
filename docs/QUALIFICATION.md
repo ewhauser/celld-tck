@@ -1,6 +1,6 @@
 # Full local qualification
 
-This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 27 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, and `test:capacity` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
+This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 29 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, and `test:capacity` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
 
 All authored TypeScript uses Effect v4 RC.115. New runtime fixtures use the same compatibility date as the API corpus. Fault scenarios assert lifecycle invariants against real celld; they are not labeled as differential workerd tests.
 
@@ -32,6 +32,8 @@ Use the name, ledger, and current endpoint from the run evidence. This command d
 Named service RPC is covered by the API corpus and checked again after each node rolls to a new fixture revision. Application streams here are a persisted ordered append feed; adapt that contract if your application uses different cursor or acknowledgment semantics. Hibernation means an eviction with a surviving connection, not a process restart.
 
 ## Storage and lifecycle faults
+
+Two [in-place deployment cases](IN-PLACE-DEPLOYMENT.md) verify explicit reload adoption and rejected replacement code without process restarts.
 
 Eight [storage durability cases](STORAGE-DURABILITY.md) cover explicit sync barriers, cursor output restrictions, and transaction/gate deadlines. They run in this group alongside the cases below.
 
