@@ -91,6 +91,22 @@ const queueRetryDelay: TestCase = {
   compare: () => Effect.void,
 };
 export const serviceCases: ReadonlyArray<TestCase> = [
+  bindingCase(
+    "kv.stream-put",
+    "/kv/stream-put",
+    {
+      bytes: [0, 128, 255, 65, 206, 187],
+      metadata: { source: "stream" },
+      deleted: null,
+    },
+    "kv/api/write-key-value-pairs",
+  ),
+  bindingCase(
+    "kv.stream-limit",
+    "/kv/stream-limit",
+    { rejected: true, missing: true },
+    "kv/api/write-key-value-pairs",
+  ),
   workflowMode("retry", { attempts: 2 }),
   workflowMode("event", { payload: { value: "λ" }, type: "continue" }),
   workflowMode("timeout", { timedOut: "Error", after: 25 }),

@@ -54,17 +54,15 @@ const SHUTDOWN_TOTAL_MS = 20000;
 const STOP_MARGIN_MS = 15000;
 
 /** The release infra/compose.yaml pins and the whole suite otherwise runs. */
-export const CURRENT_RELEASE = "0.5.0";
+export const CURRENT_RELEASE = "0.5.1";
 export const CURRENT_IMAGE =
-  "ghcr.io/denoland/celld:v0.5.0@sha256:df8e74bb9a059df5779644368984933eba76acd6a2d196672732f4368f760fc8";
+  "ghcr.io/denoland/celld:v0.5.1@sha256:9df15352bcbb92a8d73dabadc349383ccd3d7851b2ba4ccffe2c956f2f9fc93f";
 /**
- * The second explicitly pinned release. v0.5.0 lists upgrade exceptions up to
- * v0.4.0 -> v0.4.1 and names none for v0.4.1 -> v0.5.0, so the general rule
- * applies: a rolling update of the orchestrator.
+ * v0.5.1 explicitly supports a rolling update from v0.5.0.
  */
-export const PREVIOUS_RELEASE = "0.4.1";
+export const PREVIOUS_RELEASE = "0.5.0";
 export const PREVIOUS_IMAGE =
-  "ghcr.io/denoland/celld:v0.4.1@sha256:ce8bbc3c26a16c9ee00e3ce0501f36bfea2663b5af8285a08fc16a54568060a5";
+  "ghcr.io/denoland/celld:v0.5.0@sha256:df8e74bb9a059df5779644368984933eba76acd6a2d196672732f4368f760fc8";
 
 const NodeState = Schema.Struct({
   owned_cells: Schema.Int,

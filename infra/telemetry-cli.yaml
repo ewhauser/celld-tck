@@ -16,7 +16,7 @@ services:
   tool:
     networks: [default, store]
   dev:
-    image: ghcr.io/denoland/celld:v0.5.0@sha256:df8e74bb9a059df5779644368984933eba76acd6a2d196672732f4368f760fc8
+    image: ghcr.io/denoland/celld:v0.5.1@sha256:9df15352bcbb92a8d73dabadc349383ccd3d7851b2ba4ccffe2c956f2f9fc93f
     command: [dev, /work, --host, "0.0.0.0", --no-watch, --logs]
     volumes:
       - type: bind

@@ -356,6 +356,15 @@ export const mutations = {
     body("pagination repeats the first page", "second", ["/a"]),
     body("binary KV value loses its high byte", "bytes", [0, 127, 255]),
   ],
+  "kv.stream-put": [
+    body("streamed KV write loses a chunk", "bytes", [0, 128, 255, 65]),
+    body("streamed KV write drops metadata", "metadata", null),
+    body("deleted streamed value remains readable", "deleted", "stale"),
+  ],
+  "kv.stream-limit": [
+    body("oversized streamed KV value is accepted", "rejected", false),
+    body("rejected streamed value is partly stored", "missing", false),
+  ],
   "d1.bindings-results": [
     mutate("D1 binds the wrong integer", change(["body", "first", "n"], 0)),
     body("D1 raw results lose column order", "raw", [["λ'", 7]]),
@@ -1009,12 +1018,6 @@ export const divergenceMutations = {
     mutate(
       "unrelated RPC failure is incorrectly waived",
       change(["body", "error", "message"], "network unavailable"),
-    ),
-  ],
-  "dynamic.limits": [
-    mutate(
-      "the limits waiver is stretched to cover a dropped env binding",
-      change(["body"], { token: null, count: 1, upstream: "gateway /binding" }),
     ),
   ],
   "facets.outbound-transaction": [

@@ -173,6 +173,52 @@ export const services = (request: Request, env: Env, name: string) =>
           complete: second.list_complete,
         };
       }
+      case "/kv/stream-put": {
+        const key = name + "/stream";
+        const chunks = [
+          [0, 128],
+          [255, 65],
+          [206, 187],
+        ];
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            for (const chunk of chunks)
+              controller.enqueue(new Uint8Array(chunk));
+            controller.close();
+          },
+        });
+        yield* platform(() =>
+          env.KV.put(key, stream, { metadata: { source: "stream" } }),
+        );
+        const stored = yield* platform(() =>
+          env.KV.getWithMetadata(key, "arrayBuffer"),
+        );
+        yield* platform(() => env.KV.delete(key));
+        return {
+          bytes: stored.value ? [...new Uint8Array(stored.value)] : null,
+          metadata: stored.metadata,
+          deleted: yield* platform(() => env.KV.get(key)),
+        };
+      }
+      case "/kv/stream-limit": {
+        const key = name + "/oversized-stream";
+        const chunk = new Uint8Array(1024 * 1024);
+        let remaining = 26;
+        const stream = new ReadableStream<Uint8Array>({
+          pull(controller) {
+            if (remaining-- > 0) controller.enqueue(chunk);
+            else controller.close();
+          },
+        });
+        const rejected = yield* platform(() => env.KV.put(key, stream)).pipe(
+          Effect.as(false),
+          Effect.catch(() => Effect.succeed(true)),
+        );
+        return {
+          rejected,
+          missing: (yield* platform(() => env.KV.get(key))) === null,
+        };
+      }
       case "/d1/query": {
         yield* platform(() =>
           env.DB.prepare(

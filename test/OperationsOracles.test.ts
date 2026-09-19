@@ -446,26 +446,26 @@ it.effect("a bounded shutdown must stay inside its configured bound", () =>
 it.effect("binary-upgrade evidence must show the releases it claims", () =>
   Effect.gen(function* () {
     yield* checkNodeReleases(
-      { celld: "0.5.0", celld2: "0.5.0", celld3: "0.5.0" },
-      { celld: "0.5.0", celld2: "0.5.0", celld3: "0.5.0" },
+      { celld: "0.5.1", celld2: "0.5.1", celld3: "0.5.1" },
+      { celld: "0.5.1", celld2: "0.5.1", celld3: "0.5.1" },
     );
     expect(
       yield* fails(
         checkNodeReleases(
-          { celld: "0.5.0", celld2: "0.5.0", celld3: "0.5.0" },
-          { celld: "0.5.0", celld2: "0.4.1", celld3: "0.5.0" },
+          { celld: "0.5.1", celld2: "0.5.1", celld3: "0.5.1" },
+          { celld: "0.5.1", celld2: "0.5.0", celld3: "0.5.1" },
         ),
       ),
     ).toBe(true);
     yield* checkMixedFleet({
-      celld: "0.4.1",
-      celld2: "0.5.0",
-      celld3: "0.4.1",
+      celld: "0.5.0",
+      celld2: "0.5.1",
+      celld3: "0.5.0",
     });
     // A uniform fleet is never evidence of mixed-version behaviour.
     expect(
       yield* fails(
-        checkMixedFleet({ celld: "0.5.0", celld2: "0.5.0", celld3: "0.5.0" }),
+        checkMixedFleet({ celld: "0.5.1", celld2: "0.5.1", celld3: "0.5.1" }),
       ),
     ).toBe(true);
   }),

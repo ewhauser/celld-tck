@@ -1,16 +1,16 @@
 # Fleet operations
 
 Six local qualification cases exercise the operational controls celld documents
-for the pinned [v0.5.0](https://github.com/denoland/celld/blob/v0.5.0/docs/README.md)
-release, plus a rolling binary upgrade from the second explicitly pinned
-release, v0.4.1. They run in a dedicated `operations` CI job and results matrix
+for the pinned [v0.5.1](https://github.com/denoland/celld/releases/tag/v0.5.1)
+release, plus a rolling binary upgrade from the previous pinned release,
+v0.5.0. They run in a dedicated `operations` CI job and results matrix
 column.
 
 These cases qualify documented operator controls on a three-node local fleet.
 They are not a capacity model, not a claim about any particular orchestrator,
 and not a statement about an upgrade path other than the one they run.
 
-## Inventory on v0.5.0
+## Operational inventory originally established on v0.5.0
 
 Established by reading `celld --help` from the pinned image, driving a live
 three-node fleet through every control below, and reading the fleet bucket.
@@ -118,36 +118,18 @@ reload is normal recovery, so this is recorded here rather than registered as a
 bug. `operations.preserve-reload` requires `clean_reload_prepared`; if it ever
 reports `abandoned` on a clean fleet, that is the reproduction to file.
 
-### The second pinned release
+### The previous pinned release
 
-`ghcr.io/denoland/celld` publishes v0.0.1, v0.0.2, v0.2.0, v0.2.1, v0.3.0,
-v0.4.0, v0.4.1 and v0.5.0. The suite pins v0.4.1 by digest
-(`sha256:ce8bbc3c26a16c9ee00e3ce0501f36bfea2663b5af8285a08fc16a54568060a5`)
-alongside the v0.5.0 digest `infra/compose.yaml` already pins.
-
-v0.5.0 lists upgrade exceptions for v0.1.0 to v0.2.0, v0.2.1 to v0.3.0, v0.3.0
-to v0.4.0 and v0.4.0 to v0.4.1, and names **no** exception for v0.4.1 to v0.5.0.
-The general rule therefore applies: "use the rolling update of your
-orchestrator: stop each node with SIGTERM, wait for its replacement to report
-healthy, then move to the next node."
-
-Two differences matter for running them in one fleet:
-
-- v0.4.1 still has `CELLD_SHUTDOWN_DRAIN_MS` and `CELLD_DRAIN_TOKEN_WAIT_MS`,
-  and validates the token wait against the total bound. Its default token wait
-  of 30000 makes a v0.4.1 node refuse to start under the 20-second stop bound
-  this suite otherwise pins: `Error: CELLD_DRAIN_TOKEN_WAIT_MS must be at most
-3/4 of CELLD_SHUTDOWN_TOTAL_MS; maximum is 15000 for 20000, not 30000`.
-  Setting the variable instead is not an option, because v0.5.0 rejects it. The
-  upgrade overlay restores celld's own 40-second default for the whole run.
-- v0.4.1 documents `CELLD_STORAGE_PROBE`, `CELLD_EVICTIONS`, `CELLD_VARS_FILE`,
-  `CELLD_OUTPUT_GATE`, `CELLD_REBALANCE_BATCH_CELLS`, `CELLD_LOG_CAPTURE_WORKERS`
-  and `CELLD_LOG_GROUP_COMMIT_MS`, none of which v0.5.0's help lists. The suite
-  sets none of them.
-
-The command-line surface, the internal listener, the operator routes and the
-bucket layout are otherwise identical between the two, so the same harness
-drives both.
+The upgrade case pins v0.5.0 at digest
+`sha256:df8e74bb9a059df5779644368984933eba76acd6a2d196672732f4368f760fc8`
+and replaces one node at a time with the v0.5.1 digest in
+`infra/compose.yaml`. The [v0.5.1 release notes](https://github.com/denoland/celld/releases/tag/v0.5.1)
+explicitly allow a rolling update from v0.5.0. The upgrade overlay retains a
+40-second stop bound for this scenario; it sets no removed v0.4.1 controls.
+The local v0.5.0 to v0.5.1 run passed as recorded in
+[RELEASE-0.5.1.md](RELEASE-0.5.1.md). The other five operational cases still
+need a v0.5.1 run before their earlier v0.5.0 observations are considered
+requalified.
 
 ## Cases
 
@@ -192,12 +174,12 @@ node and the full ledger check to pass.
   records must be byte-identical afterwards — same node and same epoch, neither
   handed to a peer nor released. The records must still name it after the
   restart.
-- `operations.binary-upgrade`: the fleet starts on v0.4.1 with one cell on each
-  node, then each node in turn is re-pinned to v0.5.0, drained with
+- `operations.binary-upgrade`: the fleet starts on v0.5.0 with one cell on each
+  node, then each node in turn is re-pinned to v0.5.1, drained with
   `POST /shutdown`, recreated on the new image, and waited on until it reports
   healthy. Every intermediate step must be a genuinely mixed fleet running two
   distinct releases, and at each such step every cell must accept and keep an
-  acknowledged write through every live node. The fleet must finish on v0.5.0
+  acknowledged write through every live node. The fleet must finish on v0.5.1
   with every acknowledged write intact.
 
 ## Compose overlays
@@ -219,7 +201,7 @@ them.
 
 `infra/upgrade.yaml` indirects each node's image through its own variable and
 restores the 40-second stop bound, for the binary-upgrade case only. Both
-defaults are the pinned v0.5.0 digest, so selecting the overlay without setting
+defaults are the pinned v0.5.1 digest, so selecting the overlay without setting
 the variables changes nothing.
 
 The fixture gains one parameter, `?delay=` on its existing history write. It
@@ -270,6 +252,6 @@ pnpm tck --profile local --suite operations --case operations.graceful-drain
 ```
 
 Local validation uses three celld nodes and MinIO on Docker, and the
-binary-upgrade case additionally pulls the pinned v0.4.1 image. It does not
+binary-upgrade case additionally pulls the pinned v0.5.0 image. It does not
 qualify AWS, managed Cloudflare, or any fleet whose nodes sit in separate
 failure domains.

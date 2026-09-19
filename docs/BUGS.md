@@ -1,6 +1,6 @@
 # Tracked compatibility bugs
 
-[bugs.json](bugs.json) is the machine-readable registry used by the runner. Entries below are confirmed on celld **0.5.0**, reviewed September 18, 2026. Upstream reports remain local drafts.
+[bugs.json](bugs.json) is the machine-readable registry used by the runner. Its version-scoped expectations were rechecked on celld **0.5.1** on September 19, 2026. The upstream reports document the original v0.5.0 observations and remain local drafts.
 
 | ID       | Status | Bug                                                                                      | Affected cases                                  |
 | -------- | ------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------- |

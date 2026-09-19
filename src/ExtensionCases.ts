@@ -148,24 +148,12 @@ export const extensionCases = [
     },
     `${loaderDoc}usage/egress-control/`,
   ),
-  {
-    ...endpoint(
-      "dynamic.limits",
-      "/dynamic/limits",
-      { token: "limited λ", count: 1, upstream: "gateway /binding" },
-      `${loaderDoc}usage/limits/`,
-    ),
-    divergence: {
-      celldVersion: "0.5.0",
-      compatibilityDate: "2026-07-30",
-      compatibilityFlags: [],
-      source: "https://celld.dev/docs/cloudflare-compat/#dynamic-workers",
-      reason: "celld rejects the WorkerCode limits field",
-      reviewDate: "2026-09-18",
-      owner: "celld-tck maintainers",
-      check: (value: unknown) => equal(value, response({ rejected: true })),
-    },
-  },
+  endpoint(
+    "dynamic.limits",
+    "/dynamic/limits",
+    { token: "limited λ", count: 1, upstream: "gateway /binding" },
+    `${loaderDoc}usage/limits/`,
+  ),
   {
     ...endpoint(
       "facets.outbound-transaction",
@@ -178,13 +166,13 @@ export const extensionCases = [
       "https://celld.dev/docs/cloudflare-compat/#durable-object-facets",
     ),
     divergence: {
-      celldVersion: "0.5.0",
+      celldVersion: "0.5.1",
       compatibilityDate: "2026-07-30",
       compatibilityFlags: [],
       source: "https://celld.dev/docs/cloudflare-compat/#durable-object-facets",
       reason:
         "celld rejects an outbound effect from a facet while a root storage transaction holds an uncommitted facet image",
-      reviewDate: "2026-09-18",
+      reviewDate: "2026-09-19",
       owner: "celld-tck maintainers",
       check: (value: unknown) =>
         equal(

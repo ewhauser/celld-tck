@@ -3,6 +3,14 @@
   "compatibilityDate": "2026-07-30",
   "sources": [
     {
+      "runId": "tck-9d1891f6-1f3e-423e-95b0-9dfd4510ab06",
+      "sourceRevision": "working-tree@393bba5"
+    },
+    {
+      "runId": "tck-c1b2e1d0-8efe-4dbf-aecc-4809f74146ba",
+      "sourceRevision": "working-tree@393bba5"
+    },
+    {
       "runId": "tck-bf2ac88f-2e51-4d6a-9907-a701eba71f42",
       "sourceRevision": "d3f911d84635caa89e8fcee5693b7fe36c220c1f"
     },
@@ -1334,6 +1342,27 @@
         "complete": true
       }
     },
+    "kv.stream-put": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "bytes": [0, 128, 255, 65, 206, 187],
+        "metadata": { "source": "stream" },
+        "deleted": null
+      }
+    },
+    "kv.stream-limit": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "rejected": true,
+        "missing": true
+      }
+    },
     "d1.bindings-results": {
       "status": 200,
       "headers": {
@@ -2459,15 +2488,6 @@
             "length": 128
           }
         ]
-      }
-    },
-    "dynamic.limits": {
-      "status": 200,
-      "headers": {
-        "content-type": "application/json"
-      },
-      "body": {
-        "rejected": true
       }
     },
     "facets.outbound-transaction": {

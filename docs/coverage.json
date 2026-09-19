@@ -111,7 +111,13 @@
     },
     {
       "family": "kv",
-      "cases": ["kv.metadata-list", "kv.binary-pagination", "kv.expiration"]
+      "cases": [
+        "kv.metadata-list",
+        "kv.binary-pagination",
+        "kv.expiration",
+        "kv.stream-put",
+        "kv.stream-limit"
+      ]
     },
     {
       "family": "d1",

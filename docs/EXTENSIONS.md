@@ -2,7 +2,7 @@
 
 The extensions fixture exercises three platform features that are not part of the core Worker or Durable Object surface: static assets, Worker Loader (dynamic Worker) bindings, and Durable Object facets. Every case is a differential API case: the same fixture runs on workerd and on celld, and the driver owns the expectations.
 
-Expectations follow the Cloudflare reference contracts and the [celld v0.5.0 compatibility page](https://celld.dev/docs/cloudflare-compat/). A documented celld difference is registered as a divergence rather than removed from the reference expectation.
+Expectations follow the Cloudflare reference contracts and the [celld compatibility page](https://celld.dev/docs/cloudflare-compat/). A documented celld difference is registered as a divergence rather than removed from the reference expectation.
 
 ## Static assets
 
@@ -57,22 +57,21 @@ pnpm tck --profile local --suite extensions
 pnpm tck --profile reference --suite extensions --case assets.redirects
 ```
 
-Each case has an independently captured positive observation in `test/case-oracles/observations.json` and named semantic mutations in `test/case-oracles/Mutations.ts`: a lost `_headers` rule, an ignored `_redirects` rule, a suppressed trailing-slash redirect, a worker-first path that serves the shadowed asset, a negative routing rule that fails to restore asset-first order, leaked props, a lost env capability, an outbound block that leaks or that also disables bindings, and a facet transaction that commits a rolled back write or discards a committed one. The two divergence controls have their own mutations under `divergenceMutations`, so a waiver cannot be stretched to cover an unrelated failure.
+Each case has an independently captured positive observation in `test/case-oracles/observations.json` and named semantic mutations in `test/case-oracles/Mutations.ts`: a lost `_headers` rule, an ignored `_redirects` rule, a suppressed trailing-slash redirect, a worker-first path that serves the shadowed asset, a negative routing rule that fails to restore asset-first order, leaked props, a lost env capability, an outbound block that leaks or that also disables bindings, and a facet transaction that commits a rolled back write or discards a committed one. The remaining divergence control has its own mutations under `divergenceMutations`, so a waiver cannot be stretched to cover an unrelated failure.
 
 An asset error page's body and media type are presentation rather than contract, so only a served asset reports them; the not-found status itself is asserted.
 
 ## Local celld results
 
-On celld v0.5.0 every case above passes except `assets.html-routing`, which is registered as the known bug [CELL-004](BUGS.md): celld redirects `/folder` to `/folder/` and then answers 404 for that canonical path, so a directory index is unreachable. Every other observation in that case matches the reference. `assets.worker-first` passes on celld, so celld honors `run_worker_first` route patterns including the `!/` negation.
+On celld v0.5.1 every case above passes except `assets.html-routing`, which remains the known bug [CELL-004](BUGS.md): celld redirects `/folder` to `/folder/` and then answers 404 for that canonical path, so a directory index is unreachable. Every other observation in that case matches the reference. `assets.worker-first` and `dynamic.limits` pass on v0.5.1.
 
-Two cases are reviewed divergences, each registered against the compatibility page and each with a control captured from a local celld run (`tck-b7682d00-020f-425d-a55c-a22edf58d5a7`):
+One case remains a reviewed divergence on v0.5.1, confirmed in local run `tck-ff703cf6-0646-47ba-bee7-d6e6db1f5f36`:
 
 | Case                          | Documented celld behavior                                                                                          | celld observation                                                                                                                           |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dynamic.limits`              | "celld rejects `limits`, `tails`, and `allowExperimental`."                                                        | The loader refuses the field: `WorkerCode field limits is not supported`.                                                                   |
 | `facets.outbound-transaction` | "celld rejects an outbound effect from a facet while a root storage transaction holds an uncommitted facet image." | The control call reaches the gateway; the same call inside a root transaction is refused, and the facet write is still readable afterwards. |
 
-The fixture reports the refusal as an outcome rather than a message, so neither control depends on an error string or a bundle offset.
+The fixture reports the refusal as an outcome rather than a message, so the control does not depend on an error string or a bundle offset.
 
 ## Remaining coverage
 

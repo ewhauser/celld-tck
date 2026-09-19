@@ -19,7 +19,9 @@ Run identical fixtures on celld and Cloudflare’s workerd, check API behavior, 
 
 Each runtime must satisfy the case’s assertions independently. Matching incorrect results do not pass. Every API case also has a deliberately incorrect observation that its checker must reject.
 
-Tests target **celld v0.5.0** and **workerd 1.20260730.1**, with compatibility date **2026-07-30**. Container images are [pinned by digest](infra/compose.yaml). See the [case registry and exclusions](docs/coverage.json) for the full scope.
+Tests target **celld v0.5.1** and **workerd 1.20260730.1**, with compatibility date **2026-07-30**. Container images are [pinned by digest](infra/compose.yaml). See the [case registry and exclusions](docs/coverage.json) for the full scope.
+
+The [v0.5.1 upgrade assessment](docs/RELEASE-0.5.1.md) records new coverage, release-specific gaps, and local validation.
 
 ## Run locally
 
