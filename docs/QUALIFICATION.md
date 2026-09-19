@@ -1,6 +1,7 @@
 # Full local qualification
 
 This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 38 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, `test:capacity`, and `test:security` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
+This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 39 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, `test:capacity`, `test:security`, and `test:telemetry` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
 
 All authored TypeScript uses Effect v4 RC.115. New runtime fixtures use the same compatibility date as the API corpus. Fault scenarios assert lifecycle invariants against real celld; they are not labeled as differential workerd tests.
 
@@ -76,6 +77,18 @@ Five [security-boundary cases](SECURITY-BOUNDARIES.md) verify the listener split
 - `security.body-limits`: control with an acknowledged ledger write, require a body exactly at the limit to reach the application and be rejected by it, and require `413 request body too large` for one byte over, four times over, and a chunked body with no declared length.
 
 Each case snapshots ownership, the acknowledged SQL history, its KV mirror, and the durable-object event log around its denials, requires them identical, and then verifies the full ledger. Probes run inside the sidecar container because the peer and operator listener is never published to the host; pure oracles classify every observation and reject transport errors offered as denial evidence. The scenario-specific overlay lowers the ingress body limit, trusts forwarded headers on one node, and joins the deployment tool to the peer network. Peer credential expiry and replay are not testable on this release; see the linked document.
+
+## CLI and telemetry
+
+Five [CLI and telemetry cases](CLI-TELEMETRY.md) cover the `celld` command line and the traces and logs celld v0.5.0 exports.
+
+- `telemetry.cli-dev`: require six documented configuration rejections to fail with a non-zero status, report on stderr, and print nothing on the data stream; then start `celld dev` on its default listener, require its operator API to be unreachable there, write through its own local storage, require a normal stop to exit 0, and require the same row to read back after a restart.
+- `telemetry.cli-operator`: exercise `kv put`/`get`/`info`/`list`/`delete` and `d1 execute` against the deployed fixture, require `get` to return the stored bytes exactly and `list --json` to put one JSON object per key on stdout with its continuation hint on stderr, then require each documented error path to fail without emitting a partial result.
+- `telemetry.trace-context`: drive Worker → Durable Object → outbound `fetch` under a known `traceparent` and require an unbroken recorded parent chain on that trace, log markers carrying the writing handler's trace and span including one written after an `await`, and the downstream's received `traceparent` to name the recorded outbound span. Require a malformed header to start a new unrelated trace, and a root request on the zero-ratio node to record nothing while the same probe on an always-on node records.
+- `telemetry.export-isolation`: require every payload to be OTLP/HTTP protobuf naming the configured service, then fail the collector transiently under acknowledged traffic and require an observed fault, a redelivery of the same batch, no more than the documented five attempts, and an unchanged complete application history.
+- `telemetry.parquet-export`: require every Parquet object under the documented `telemetry/<signal>/<node>/<yyyy>/<mm>/<dd>/<hh>/` layout, the `v0-unstable` schema version in object metadata, and each file's footer to declare a positive row count and the columns the published DuckDB queries select.
+
+The OTLP cases assert on payloads a recording collector sidecar decoded, never on celld's own log output. Each delivery is digested, so a repeated digest is what proves a retry. Only the Parquet footer is read, so column values, retention, and the bounded telemetry queue stay unasserted; the linked document records why.
 
 Each scenario has an eight-minute bound and separate artifacts under its ID. The aggregate report and JUnit retain unexecuted placeholders and infrastructure failures. CI runs each group independently. Local Docker results do not qualify AWS, managed Cloudflare delivery guarantees, or host/availability-zone failure domains.
 

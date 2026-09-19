@@ -6,17 +6,17 @@ The suite currently pins celld v0.5.0. Upstream documentation changes independen
 
 ## Priorities
 
-| Order | Workstream                          | Starting point                                                                                                              | Environment                                                          |
-| ----- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| 1     | Storage durability contracts        | Barrier, cursor, and deadline cases implemented; post-abort sync remains open                                               | Local workerd and celld; fault scenarios on celld                    |
-| 2     | In-place deployment                 | Explicit reload and invalid-replacement cases implemented; lifecycle transitions remain open                                | Local celld fleet                                                    |
-| 3     | Security boundaries                 | Listener, reserved-class, forwarded-header, and body-limit cases implemented; peer credential ageing and replay remain open | Isolated local celld fleet                                           |
-| 4     | Assets, dynamic Workers, and facets | One API case per feature                                                                                                    | Local reference and candidate, with celld recovery scenarios         |
-| 5     | Runtime and service breadth         | Representative cases, not comprehensive API coverage                                                                        | Local where possible; controlled network/clock fixtures where needed |
-| 6     | Fleet operations and upgrades       | Failover and bounded capacity tests exist                                                                                   | Local multi-node fleet and explicitly selected binary versions       |
-| 7     | CLI and telemetry                   | No dedicated end-to-end suites                                                                                              | Local celld, object store, and test collector                        |
-| 8     | Containers and Sandbox              | Explicitly excluded today                                                                                                   | Separate container-runtime test environment                          |
-| 9     | Cloud qualification                 | Local MinIO coverage only                                                                                                   | Dedicated provider accounts and managed reference environment        |
+| Order | Workstream                          | Starting point                                                                                                                | Environment                                                          |
+| ----- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 1     | Storage durability contracts        | Barrier, cursor, and deadline cases implemented; post-abort sync remains open                                                 | Local workerd and celld; fault scenarios on celld                    |
+| 2     | In-place deployment                 | Explicit reload and invalid-replacement cases implemented; lifecycle transitions remain open                                  | Local celld fleet                                                    |
+| 3     | Security boundaries                 | Listener, reserved-class, forwarded-header, and body-limit cases implemented; peer credential ageing and replay remain open   | Isolated local celld fleet                                           |
+| 4     | Assets, dynamic Workers, and facets | One API case per feature                                                                                                      | Local reference and candidate, with celld recovery scenarios         |
+| 5     | Runtime and service breadth         | Representative cases, not comprehensive API coverage                                                                          | Local where possible; controlled network/clock fixtures where needed |
+| 6     | Fleet operations and upgrades       | Failover and bounded capacity tests exist                                                                                     | Local multi-node fleet and explicitly selected binary versions       |
+| 7     | CLI and telemetry                   | CLI, trace-context, OTLP export, Parquet, and collector-outage cases implemented; retention and the bounded queue remain open | Local celld, object store, and recording OTLP collector              |
+| 8     | Containers and Sandbox              | Explicitly excluded today                                                                                                     | Separate container-runtime test environment                          |
+| 9     | Cloud qualification                 | Local MinIO coverage only                                                                                                     | Dedicated provider accounts and managed reference environment        |
 
 These are implementation priorities, not release dates. Keep workstreams independently reviewable.
 
@@ -95,12 +95,14 @@ Use multiple cells and retain ownership, readiness, and acknowledged-write evide
 
 ## 7. CLI and telemetry
 
-- [ ] **CLI:** `celld dev` startup, local persistence, shutdown, invalid configuration, and listener defaults; supported D1/KV operator commands and their error paths.
-- [ ] **Trace context:** propagation across Worker, Durable Object, and outbound calls; malformed input; log correlation across asynchronous work.
-- [ ] **Export:** Parquet schema and records, OTLP payloads, sampling, retry, and retention behavior.
-- [ ] **Failure isolation:** collector/storage outages and bounded telemetry queues must not silently change application results.
+- [x] **CLI:** `celld dev` startup, local persistence, shutdown, invalid configuration, and listener defaults; supported D1/KV operator commands and their error paths. Covered by `telemetry.cli-dev` and `telemetry.cli-operator`. `celld dev`'s build-and-watch path is not exercised: the pinned image ships no esbuild, so the suite runs a pre-bundled project, leaving `--clean`, `--watch-ignore`, and `.dev.vars` open. `celld queue` and `celld cell list` are inventoried but uncovered.
+- [x] **Trace context:** propagation across Worker, Durable Object, and outbound calls; malformed input; log correlation across asynchronous work. Covered by `telemetry.trace-context`, including a log line written after an `await` and the `traceparent` the downstream fixture actually received.
+- [ ] **Export:** Parquet schema and records, OTLP payloads, sampling, retry, and retention behavior. `telemetry.export-isolation` and `telemetry.parquet-export` cover the OTLP envelope, the documented five-attempt retry cap, the bucket partition layout, the `v0-unstable` schema version, and each file's declared columns and row count; `telemetry.trace-context` covers sampling. Parquet column _values_ remain unread, and retention remains open: the sweep runs at startup and then every six hours, and v0.5.0 does not document whether a node sweeps objects other than its own.
+- [ ] **Failure isolation:** collector/storage outages and bounded telemetry queues must not silently change application results. `telemetry.export-isolation` covers the collector outage with an independently observed fault and an unchanged acknowledged history. The bounded queue remains open: its 8192-event channel needs sustained load past what a bounded local case should generate, and the drop counter celld keeps is not exposed on any documented endpoint.
 
 Use a local collector that records received payloads. Finding a log line alone is insufficient evidence of telemetry correctness.
+
+Implemented coverage, the v0.5.0 CLI and telemetry inventory it rests on, and the untestable items are in [CLI-TELEMETRY.md](CLI-TELEMETRY.md).
 
 ## 8. Containers and Sandbox
 
