@@ -60,10 +60,7 @@
       },
       "body": {
         "method": "POST",
-        "query": [
-          "first",
-          "second"
-        ],
+        "query": ["first", "second"],
         "header": "seed-42",
         "body": "hello λ 🌍\n"
       }
@@ -109,10 +106,7 @@
             "zero": 0,
             "flag": false,
             "nil": null,
-            "nested": [
-              42,
-              "x"
-            ]
+            "nested": [42, "x"]
           }
         }
       },
@@ -122,10 +116,7 @@
           "content-type": "application/json"
         },
         "body": [
-          [
-            "item:a",
-            "first"
-          ],
+          ["item:a", "first"],
           [
             "item:b",
             {
@@ -134,10 +125,7 @@
               "zero": 0,
               "flag": false,
               "nil": null,
-              "nested": [
-                42,
-                "x"
-              ]
+              "nested": [42, "x"]
             }
           ]
         ]
@@ -269,10 +257,7 @@
           "value": 1
         },
         "list": [
-          [
-            "b",
-            "λ"
-          ],
+          ["b", "λ"],
           [
             "a",
             {
@@ -348,22 +333,12 @@
       },
       "body": {
         "pathname": "/a%20b",
-        "query": [
-          "1",
-          "2"
-        ],
-        "values": [
-          "first",
-          "λ"
-        ],
+        "query": ["1", "2"],
+        "values": ["first", "λ"],
         "file": {
           "name": "bytes.bin",
           "type": "application/octet-stream",
-          "bytes": [
-            0,
-            128,
-            255
-          ]
+          "bytes": [0, 128, 255]
         }
       }
     },
@@ -373,20 +348,10 @@
         "content-type": "application/json"
       },
       "body": {
-        "bytes": [
-          206,
-          187,
-          240,
-          159,
-          140,
-          141
-        ],
+        "bytes": [206, 187, 240, 159, 140, 141],
         "decoded": "λ🌍",
         "base64": "AP8=",
-        "decodedBase64": [
-          0,
-          255
-        ],
+        "decodedBase64": [0, 255],
         "invalid": "TypeError"
       }
     },
@@ -465,22 +430,14 @@
             "buffer",
             {
               "type": "ArrayBuffer",
-              "value": [
-                8,
-                9
-              ]
+              "value": [8, 9]
             }
           ],
           [
             "bytes",
             {
               "type": "Uint8Array",
-              "value": [
-                0,
-                127,
-                128,
-                255
-              ]
+              "value": [0, 127, 128, 255]
             }
           ],
           [
@@ -611,47 +568,19 @@
       },
       "body": {
         "got": [
-          [
-            "k:a",
-            1
-          ],
-          [
-            "k:c",
-            3
-          ]
+          ["k:a", 1],
+          ["k:c", 3]
         ],
-        "forward": [
-          [
-            "k:b",
-            2
-          ]
-        ],
+        "forward": [["k:b", 2]],
         "reverse": [
-          [
-            "k:c",
-            3
-          ],
-          [
-            "k:b",
-            2
-          ]
+          ["k:c", 3],
+          ["k:b", 2]
         ],
-        "after": [
-          [
-            "k:b",
-            2
-          ]
-        ],
+        "after": [["k:b", 2]],
         "deleted": 2,
         "remaining": [
-          [
-            "k:b",
-            2
-          ],
-          [
-            "other",
-            9
-          ]
+          ["k:b", 2],
+          ["other", 9]
         ]
       }
     },
@@ -673,14 +602,8 @@
       "body": {
         "result": 7,
         "entries": [
-          [
-            "a",
-            7
-          ],
-          [
-            "b",
-            8
-          ]
+          ["a", 7],
+          ["b", 8]
         ]
       }
     },
@@ -709,14 +632,7 @@
         "content-type": "application/json"
       },
       "body": {
-        "columns": [
-          "id",
-          "text",
-          "n",
-          "empty",
-          "nil",
-          "bytes"
-        ],
+        "columns": ["id", "text", "n", "empty", "nil", "bytes"],
         "inserted": [
           {
             "id": 1,
@@ -726,21 +642,11 @@
             "nil": null,
             "bytes": {
               "type": "ArrayBuffer",
-              "value": [
-                0,
-                128,
-                255
-              ]
+              "value": [0, 128, 255]
             }
           }
         ],
-        "raw": [
-          [
-            1,
-            "λ'",
-            null
-          ]
-        ],
+        "raw": [[1, "λ'", null]],
         "count": {
           "n": 1
         }
@@ -1076,22 +982,14 @@
             "buffer",
             {
               "type": "ArrayBuffer",
-              "value": [
-                8,
-                9
-              ]
+              "value": [8, 9]
             }
           ],
           [
             "bytes",
             {
               "type": "Uint8Array",
-              "value": [
-                0,
-                127,
-                128,
-                255
-              ]
+              "value": [0, 127, 128, 255]
             }
           ],
           [
@@ -1272,18 +1170,8 @@
         "content-type": "application/json"
       },
       "body": {
-        "a": [
-          0,
-          128,
-          255,
-          10
-        ],
-        "b": [
-          0,
-          128,
-          255,
-          10
-        ]
+        "a": [0, 128, 255, 10],
+        "b": [0, 128, 255, 10]
       }
     },
     "streams.cancel": {
@@ -1330,9 +1218,7 @@
         "initial": 1,
         "blocked": 0,
         "resumed": 1,
-        "trace": [
-          "one"
-        ]
+        "trace": ["one"]
       }
     },
     "streams.http-binary": {
@@ -1340,13 +1226,7 @@
       "headers": {
         "content-type": "application/octet-stream"
       },
-      "body": [
-        0,
-        1,
-        128,
-        255,
-        10
-      ]
+      "body": [0, 1, 128, 255, 10]
     },
     "websocket.protocol-attachment": [
       {
@@ -1358,11 +1238,7 @@
       },
       {
         "type": "message",
-        "value": [
-          0,
-          128,
-          255
-        ]
+        "value": [0, 128, 255]
       },
       {
         "type": "message",
@@ -1425,9 +1301,7 @@
             "tag": 7
           }
         },
-        "names": [
-          "/a"
-        ],
+        "names": ["/a"],
         "complete": true,
         "missing": null
       }
@@ -1438,17 +1312,9 @@
         "content-type": "application/json"
       },
       "body": {
-        "bytes": [
-          0,
-          128,
-          255
-        ],
-        "first": [
-          "/a"
-        ],
-        "second": [
-          "/b"
-        ],
+        "bytes": [0, 128, 255],
+        "first": ["/a"],
+        "second": ["/b"],
         "complete": true
       }
     },
@@ -1468,17 +1334,9 @@
         "first": {
           "n": 7,
           "text": "λ'",
-          "bytes": [
-            0,
-            255
-          ]
+          "bytes": [0, 255]
         },
-        "raw": [
-          [
-            7,
-            "λ'"
-          ]
-        ]
+        "raw": [[7, "λ'"]]
       }
     },
     "d1.batch-rollback": {
@@ -1497,25 +1355,15 @@
         "content-type": "application/json"
       },
       "body": {
-        "bytes": [
-          0,
-          128,
-          255,
-          10
-        ],
-        "range": [
-          128,
-          255
-        ],
+        "bytes": [0, 128, 255, 10],
+        "range": [128, 255],
         "size": 4,
         "type": "application/test",
         "metadata": {
           "label": "λ"
         },
         "sameEtag": true,
-        "names": [
-          "/a"
-        ],
+        "names": ["/a"],
         "missing": null
       }
     },
@@ -1582,10 +1430,7 @@
         "hex": "cebbf09f8c8d",
         "base64": "zrvwn4yN",
         "roundTrip": "λ🌍",
-        "slice": [
-          206,
-          187
-        ]
+        "slice": [206, 187]
       }
     },
     "node.path-events": {
@@ -1596,11 +1441,7 @@
       "body": {
         "path": "/b/c",
         "basename": "b",
-        "trace": [
-          "once:a",
-          "on:a",
-          "on:b"
-        ],
+        "trace": ["once:a", "on:a", "on:b"],
         "remaining": 0
       }
     },
@@ -2069,9 +1910,7 @@
           "kty": "EC",
           "crv": "P-256",
           "ext": true,
-          "keyOps": [
-            "verify"
-          ],
+          "keyOps": ["verify"],
           "xBytes": 32,
           "yBytes": 32,
           "privateOmitted": true
@@ -2081,21 +1920,14 @@
           "uncompressed": true
         },
         "usages": {
-          "private": [
-            "sign"
-          ],
-          "public": [
-            "verify"
-          ]
+          "private": ["sign"],
+          "public": ["verify"]
         },
         "algorithm": {
           "name": "ECDSA",
           "namedCurve": "P-256"
         },
-        "types": [
-          "private",
-          "public"
-        ]
+        "types": ["private", "public"]
       }
     },
     "crypto.key-derivation": {
@@ -2124,46 +1956,19 @@
         "content-type": "application/json"
       },
       "body": {
-        "hmacRaw": [
-          107,
-          101,
-          121
-        ],
-        "aesRaw": [
-          0,
-          1,
-          2,
-          3,
-          4,
-          5,
-          6,
-          7,
-          8,
-          9,
-          10,
-          11,
-          12,
-          13,
-          14,
-          15
-        ],
+        "hmacRaw": [107, 101, 121],
+        "aesRaw": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
         "hmacJwk": {
           "kty": "oct",
           "alg": "HS256",
-          "keyOps": [
-            "sign",
-            "verify"
-          ],
+          "keyOps": ["sign", "verify"],
           "ext": true,
           "k": "a2V5"
         },
         "aesJwk": {
           "kty": "oct",
           "alg": "A128GCM",
-          "keyOps": [
-            "encrypt",
-            "decrypt"
-          ],
+          "keyOps": ["encrypt", "decrypt"],
           "ext": true,
           "k": "AAECAwQFBgcICQoLDA0ODw"
         },
@@ -2220,10 +2025,7 @@
                   "bytes",
                   {
                     "type": "Uint8Array",
-                    "value": [
-                      0,
-                      255
-                    ]
+                    "value": [0, 255]
                   }
                 ],
                 [
@@ -2284,16 +2086,10 @@
             "lastEventId": "1"
           }
         ],
-        "trace": [
-          "error"
-        ],
+        "trace": ["error"],
         "exhausted": 2,
         "closed": 2,
-        "states": [
-          0,
-          1,
-          2
-        ],
+        "states": [0, 1, 2],
         "withCredentials": false
       }
     },
@@ -2315,14 +2111,8 @@
           "map": true,
           "notDate": false
         },
-        "deepEqual": [
-          true,
-          false
-        ],
-        "sharedEncoder": [
-          2,
-          "λ"
-        ]
+        "deepEqual": [true, false],
+        "sharedEncoder": [2, "λ"]
       }
     },
     "node.assert": {
@@ -2344,14 +2134,10 @@
           "code": "ERR_ASSERTION",
           "operator": "deepStrictEqual",
           "actual": {
-            "a": [
-              1
-            ]
+            "a": [1]
           },
           "expected": {
-            "a": [
-              2
-            ]
+            "a": [2]
           }
         },
         "typeSensitive": {
@@ -2381,16 +2167,9 @@
         "content-type": "application/json"
       },
       "body": {
-        "chunks": [
-          "a",
-          "λ"
-        ],
+        "chunks": ["a", "λ"],
         "chunkType": "string",
-        "binary": [
-          0,
-          128,
-          255
-        ],
+        "binary": [0, 128, 255],
         "fromWeb": "aλ",
         "race": "fast",
         "immediate": "soon",

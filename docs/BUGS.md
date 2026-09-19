@@ -8,9 +8,9 @@
 | CELL-002 | Open   | [Negative list limit error class](upstream/storage-list-validation.md)                 | `storage.invalid-input`, `repro.storage-errors` |
 | CELL-003 | Open   | [Uncloneable storage value error class](upstream/storage-clone-errors.md)              | `storage.invalid-input`, `repro.storage-errors` |
 | CELL-004 | Open   | [Missing directory index for a trailing-slash path](upstream/asset-directory-index.md) | `assets.html-routing`                           |
-| CELL-004 | Open   | [EC public key export formats](upstream/webcrypto-ec-key-export.md)                    | `crypto.ecdsa-p256`                             |
-| CELL-005 | Open   | [SubtleCrypto key usage and length validation](upstream/webcrypto-input-validation.md) | `crypto.invalid-input`                          |
-| CELL-006 | Open   | [node:stream web-stream interop](upstream/node-stream-web-interop.md)                  | `node.stream-timers`                            |
+| CELL-005 | Open   | [EC public key export formats](upstream/webcrypto-ec-key-export.md)                    | `crypto.ecdsa-p256`                             |
+| CELL-006 | Open   | [SubtleCrypto key usage and length validation](upstream/webcrypto-input-validation.md) | `crypto.invalid-input`                          |
+| CELL-007 | Open   | [node:stream web-stream interop](upstream/node-stream-web-interop.md)                  | `node.stream-timers`                            |
 
 ## Run policy
 
