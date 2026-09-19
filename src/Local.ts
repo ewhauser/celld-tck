@@ -57,8 +57,16 @@ export type LocalOptions = {
       qualification: true;
       /** Adds the security-boundary overlay and the in-network probe binary. */
       security?: boolean;
+      /**
+       * Selects a telemetry overlay: `otlp` adds the recording collector
+       * sidecar and points every node at it, `bucket` selects the Parquet sink,
+       * and `cli` adds the `celld dev` service without enabling telemetry.
+       */
+      telemetry?: TelemetryMode | undefined;
     }
 );
+
+export type TelemetryMode = "otlp" | "bucket" | "cli";
 
 export const acquireLocal = (options: LocalOptions) =>
   Effect.gen(function* () {
@@ -67,10 +75,12 @@ export const acquireLocal = (options: LocalOptions) =>
     const nodeCount = options.topology === "cluster" ? options.nodeCount : 2;
     const durability = options.durability ?? "bucket";
     const qualification = options.qualification ?? false;
-    const security =
+    const qualified =
       options.topology === "cluster" && options.qualification === true
-        ? (options.security ?? false)
-        : false;
+        ? options
+        : undefined;
+    const security = qualified?.security ?? false;
+    const telemetry: TelemetryMode | undefined = qualified?.telemetry;
     const wantsDeploymentChecks =
       options.topology === "single" && (options.deploymentChecks ?? false);
     const processes = yield* Processes;
@@ -113,6 +123,9 @@ export const acquireLocal = (options: LocalOptions) =>
         ["three-node.yaml", multiNode && nodeCount === 3],
         ["qualification.yaml", qualification],
         ["security.yaml", security],
+        ["telemetry.yaml", telemetry === "otlp"],
+        ["telemetry-bucket.yaml", telemetry === "bucket"],
+        ["telemetry-cli.yaml", telemetry === "cli"],
         ["manual-reload.yaml", options.manualReload ?? false],
         ["adoption-deadline.yaml", options.adoptionDeadline ?? false],
       ] as const
@@ -145,6 +158,14 @@ export const acquireLocal = (options: LocalOptions) =>
       { entry: "./StorageProxy.ts", out: "proxy.mjs" },
       ...(security
         ? [{ entry: "./SecurityProbe.ts", out: "security-probe.mjs" }]
+        : []),
+      ...(telemetry === "otlp"
+        ? [
+            {
+              entry: "./TelemetryCollector.ts",
+              out: "telemetry-collector.mjs",
+            },
+          ]
         : []),
     ];
     for (const sidecar of sidecars)
@@ -250,6 +271,25 @@ export const acquireLocal = (options: LocalOptions) =>
           "tool",
           "--version",
         ])).stdout.trim();
+        // The nodes open their exporter at startup, so the collector has to be
+        // answering before any of them boots.
+        if (telemetry === "otlp") {
+          yield* compose(["up", "-d", "collector"]);
+          yield* compose([
+            "exec",
+            "-T",
+            "collector",
+            "node",
+            "--input-type=module",
+            "-e",
+            'const response = await fetch("http://127.0.0.1:9092/"); if (!response.ok) process.exitCode = 1;',
+          ]).pipe(
+            Effect.retry({
+              schedule: Schedule.spaced("200 millis"),
+              times: 25,
+            }),
+          );
+        }
         yield* compose([
           "up",
           "-d",
@@ -485,6 +525,22 @@ export const acquireLocal = (options: LocalOptions) =>
                   baseUrl: `http://${result.stdout.trim()}`,
                 })),
               ),
+            /** Loopback control endpoint of the recording OTLP collector. */
+            collector: () =>
+              publishedPort(
+                compose,
+                "collector",
+                "9092",
+                "telemetry",
+                (value) => `Unexpected collector address: ${value}`,
+              ).pipe(
+                Effect.map((address) => ({
+                  name: "telemetry-collector",
+                  baseUrl: `http://${address}`,
+                })),
+              ),
+            /** The project directory `celld dev` owns, as the dev service sees it. */
+            fixtureDirectory: bundle.directory,
             deploy: () => toolDeploy(compose, "/fixture", { dryRun: false }),
             evict: (node: string, cell: string) =>
               compose([
