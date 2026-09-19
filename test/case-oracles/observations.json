@@ -49,6 +49,10 @@
     {
       "runId": "tck-0c3c37cf-d018-4e54-b741-aeec138d7628",
       "sourceRevision": "0b59e3217d67aa00e2b887a0de4ca83fc26c0c52"
+    },
+    {
+      "runId": "tck-f504445f-115e-419e-9fa7-b4ec2aaa43e9",
+      "sourceRevision": "e45af25f757cfe2b5d07aad05d6b3b8b4dba2d1b"
     }
   ],
   "cases": {
@@ -2174,6 +2178,177 @@
         "race": "fast",
         "immediate": "soon",
         "aborted": "AbortError"
+      }
+    },
+    "websocket.outbound-close": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "echo": {
+          "type": "message",
+          "data": "echo:ping λ"
+        },
+        "closed": {
+          "type": "close",
+          "code": 4001,
+          "reason": "server λ",
+          "clean": true
+        },
+        "readyState": 3,
+        "invalidCode": "InvalidAccessError"
+      }
+    },
+    "websocket.concurrent-sockets": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "echoes": [
+          "echo:n0",
+          "echo:n1",
+          "echo:n10",
+          "echo:n11",
+          "echo:n12",
+          "echo:n13",
+          "echo:n14",
+          "echo:n15",
+          "echo:n2",
+          "echo:n3",
+          "echo:n4",
+          "echo:n5",
+          "echo:n6",
+          "echo:n7",
+          "echo:n8",
+          "echo:n9"
+        ],
+        "open": 16
+      }
+    },
+    "flags.enabled-defaults": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "binaryType": "blob",
+        "deleteAll": {
+          "values": [],
+          "alarmPresent": false
+        }
+      }
+    },
+    "flags.disabled-counterparts": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "binaryType": "arraybuffer",
+        "deleteAll": {
+          "values": [],
+          "alarmPresent": true
+        }
+      }
+    },
+    "kv.expiration": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "value": "λ",
+        "metadata": {
+          "tag": 1
+        },
+        "names": ["/keep", "/ttl"],
+        "keepExpiration": null,
+        "expiringInWindow": true,
+        "tooShort": "Error"
+      }
+    },
+    "d1.exec-batch": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "execCount": 2,
+        "success": [true, true, true],
+        "results": [
+          [],
+          [],
+          [
+            {
+              "n": 1
+            },
+            {
+              "n": 2
+            }
+          ]
+        ],
+        "changes": [1, 1, 0]
+      }
+    },
+    "r2.list-options": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "objects": ["/top"],
+        "prefixes": ["/dir/"],
+        "truncated": false,
+        "nested": ["/dir/a", "/dir/b"],
+        "nestedPrefixes": [],
+        "bare": {
+          "http": {},
+          "custom": {}
+        },
+        "included": {
+          "http": "text/plain; charset=utf-8",
+          "custom": {
+            "label": "λ"
+          }
+        },
+        "written": {
+          "type": "text/plain; charset=utf-8",
+          "disposition": "attachment; filename=\"λ.txt\"",
+          "cache": "max-age=42"
+        }
+      }
+    },
+    "queues.retry-delay": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "delayed:1": {
+          "attempts": 1,
+          "at": 1789785828962,
+          "id": "4e233dafb42fa44e6b82e48710a0bc4e"
+        },
+        "delayed:2": {
+          "attempts": 2,
+          "at": 1789785832969,
+          "id": "4e233dafb42fa44e6b82e48710a0bc4e"
+        }
+      }
+    },
+    "workflows.timeout": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "status": "complete",
+        "output": {
+          "timedOut": "Error",
+          "after": 25
+        }
       }
     }
   },

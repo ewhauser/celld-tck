@@ -805,6 +805,145 @@ export const mutations = {
     ),
     body("failed batch stores a partial result", "absent", false),
   ],
+  "websocket.outbound-close": [
+    mutate(
+      "the server's close code is replaced by a generic normal closure",
+      change(["body", "closed", "code"], 1000),
+    ),
+    mutate(
+      "the close reason is dropped from the client's close event",
+      change(["body", "closed", "reason"], ""),
+    ),
+    mutate(
+      "an outbound socket stays open after its peer closed it",
+      change(["body", "readyState"], 1),
+    ),
+    mutate(
+      "close() accepts the reserved code 1005",
+      change(["body", "invalidCode"], "accepted"),
+    ),
+    body("the outbound frame is not echoed back", "echo", {
+      type: "message",
+      data: "echo:",
+    }),
+  ],
+  "websocket.concurrent-sockets": [
+    mutate(
+      "one of sixteen concurrent sockets is silently dropped",
+      change(["body", "open"], 15),
+    ),
+    mutate(
+      "concurrent sockets cross-deliver one another's frames",
+      change(["body", "echoes", 0], "echo:n1"),
+    ),
+  ],
+  "flags.enabled-defaults": [
+    mutate(
+      "deleteAll() preserves the alarm even with the default flag on",
+      change(["body", "deleteAll", "alarmPresent"], true),
+    ),
+    mutate(
+      "the default binaryType keeps the legacy value",
+      change(["body", "binaryType"], "arraybuffer"),
+    ),
+  ],
+  "flags.disabled-counterparts": [
+    mutate(
+      "delete_all_preserves_alarm is ignored and the alarm is deleted",
+      change(["body", "deleteAll", "alarmPresent"], false),
+    ),
+    mutate(
+      "no_websocket_standard_binary_type is ignored",
+      change(["body", "binaryType"], "blob"),
+    ),
+    mutate(
+      "deleteAll() leaves stored values behind under the disable flag",
+      change(["body", "deleteAll", "values"], [["a", 1]]),
+    ),
+  ],
+  "kv.expiration": [
+    mutate(
+      "expirationTtl is ignored and the key is listed without an expiration",
+      change(["body", "expiringInWindow"], false),
+    ),
+    mutate(
+      "a key stored without a TTL is given one",
+      change(["body", "keepExpiration"], 1789786428),
+    ),
+    mutate(
+      "a TTL below the documented minimum is accepted",
+      change(["body", "tooShort"], "accepted"),
+    ),
+    body("metadata is lost when an expiration is set", "metadata", null),
+  ],
+  "d1.exec-batch": [
+    mutate(
+      "exec() reports a single statement for a multi-statement script",
+      change(["body", "execCount"], 1),
+    ),
+    mutate(
+      "a batched insert is lost before the batch's own read",
+      change(["body", "results", 2], [{ n: 2 }]),
+    ),
+    mutate(
+      "an insert reports no changed rows",
+      change(["body", "changes", 0], 0),
+    ),
+    mutate(
+      "a statement in the batch reports failure",
+      change(["body", "success", 1], false),
+    ),
+  ],
+  "r2.list-options": [
+    mutate(
+      "the delimiter does not roll up nested keys",
+      change(["body", "objects"], ["/dir/a", "/dir/b", "/top"]),
+    ),
+    mutate(
+      "no common prefix is reported for the delimiter",
+      change(["body", "prefixes"], []),
+    ),
+    mutate(
+      "a deeper prefix does not descend into the rolled-up keys",
+      change(["body", "nested"], []),
+    ),
+    mutate(
+      "include is ignored and stored HTTP metadata is not returned",
+      change(["body", "included", "http"], null),
+    ),
+    mutate(
+      "stored metadata leaks into a listing that did not request it",
+      change(["body", "bare", "custom"], { label: "λ" }),
+    ),
+    mutate(
+      "writeHttpMetadata loses the stored content disposition",
+      change(["body", "written", "disposition"], null),
+    ),
+  ],
+  "queues.retry-delay": [
+    mutate(
+      "the explicit retry delay is ignored and redelivery is immediate",
+      change(["body", "delayed:2", "at"], 1789785828970),
+    ),
+    mutate(
+      "redelivery arrives as a new message instead of a retry",
+      change(["body", "delayed:2", "id"], "0000000000000000000000000000000a"),
+    ),
+    mutate(
+      "the retried delivery reports the first attempt number again",
+      change(["body", "delayed:2", "attempts"], 1),
+    ),
+  ],
+  "workflows.timeout": [
+    mutate(
+      "waitForEvent resolves instead of timing out",
+      change(["body", "output", "timedOut"], "accepted"),
+    ),
+    mutate(
+      "the instance does not continue past the timed-out step",
+      change(["body", "output", "after"], 20),
+    ),
+  ],
 } satisfies Record<string, readonly [Mutation, ...Mutation[]]>;
 
 export const divergenceMutations = {
