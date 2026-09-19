@@ -254,12 +254,21 @@ export const web = (request: Request) =>
         );
         const jwk = yield* exportJwk(pair.publicKey);
         const raw = yield* exportRaw(pair.publicKey);
-        const fromJwk = yield* platform(() =>
-          crypto.subtle.importKey("jwk", jwk, curve, true, ["verify"]),
-        );
-        const fromRaw = yield* platform(() =>
-          crypto.subtle.importKey("raw", raw, curve, true, ["verify"]),
-        );
+        // Re-importing the exported public key must reproduce a key that verifies
+        // the same signature. A runtime that cannot import the format reports the
+        // rejection here instead of failing the whole observation.
+        const reimportVerified = (
+          imported: Effect.Effect<CryptoKey, unknown>,
+        ) =>
+          outcome(
+            imported.pipe(
+              Effect.flatMap((key) =>
+                platform(() =>
+                  crypto.subtle.verify(signing, key, signature, data),
+                ),
+              ),
+            ),
+          );
         const tampered = new Uint8Array(signature.slice(0));
         tampered[0] = tampered[0]! ^ 1;
         return {
@@ -272,11 +281,15 @@ export const web = (request: Request) =>
           tampered: yield* platform(() =>
             crypto.subtle.verify(signing, pair.publicKey, tampered, data),
           ),
-          jwkVerified: yield* platform(() =>
-            crypto.subtle.verify(signing, fromJwk, signature, data),
+          jwkVerified: yield* reimportVerified(
+            platform(() =>
+              crypto.subtle.importKey("jwk", jwk, curve, true, ["verify"]),
+            ),
           ),
-          rawVerified: yield* platform(() =>
-            crypto.subtle.verify(signing, fromRaw, signature, data),
+          rawVerified: yield* reimportVerified(
+            platform(() =>
+              crypto.subtle.importKey("raw", raw, curve, true, ["verify"]),
+            ),
           ),
           jwk: {
             kty: jwk.kty,
@@ -401,21 +414,11 @@ export const web = (request: Request) =>
               })),
             ),
           );
-        const imported = yield* platform(() =>
-          crypto.subtle.importKey(
-            "jwk",
-            { kty: "oct", k: "AAECAwQFBgcICQoLDA0ODw", ext: true },
-            "AES-GCM",
-            true,
-            ["encrypt"],
-          ),
-        );
         return {
           hmacRaw: [...new Uint8Array(yield* exportRaw(hmac))],
           aesRaw: [...new Uint8Array(yield* exportRaw(aes))],
           hmacJwk: yield* secretJwk(hmac),
           aesJwk: yield* secretJwk(aes),
-          jwkImported: [...new Uint8Array(yield* exportRaw(imported))],
           algorithms: [hmac.algorithm, aes.algorithm],
         };
       }

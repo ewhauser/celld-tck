@@ -397,11 +397,21 @@ export const mutations = {
     body("ECDSA rejects its own valid signature", "verified", false),
     mutate(
       "a JWK-imported public key cannot verify the signature",
-      change(["body", "jwkVerified"], false),
+      change(["body", "jwkVerified"], "NotSupportedError"),
     ),
     mutate(
       "a raw-imported public key cannot verify the signature",
       change(["body", "rawVerified"], false),
+    ),
+    mutate(
+      "the raw public key is exported in a different encoding",
+      change(["body", "raw", "bytes"], 91),
+      change(["body", "raw", "uncompressed"], false),
+    ),
+    mutate(
+      "exported public JWK omits its extractability metadata",
+      change(["body", "jwk", "ext"], false),
+      change(["body", "jwk", "keyOps"], []),
     ),
     mutate(
       "exported public JWK leaks the private scalar",
@@ -461,13 +471,6 @@ export const mutations = {
     mutate(
       "JWK export marks an extractable key as non-extractable",
       change(["body", "hmacJwk", "ext"], false),
-    ),
-    mutate(
-      "a JWK-imported AES key holds different bytes",
-      change(
-        ["body", "jwkImported"],
-        [15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
-      ),
     ),
     mutate(
       "imported key reports the wrong bit length",

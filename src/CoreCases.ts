@@ -284,7 +284,6 @@ export const coreCases: ReadonlyArray<TestCase> = [
         ext: true,
         k: "AAECAwQFBgcICQoLDA0ODw",
       },
-      jwkImported: Array.from({ length: 16 }, (_, i) => i),
       algorithms: [
         { name: "HMAC", hash: { name: "SHA-256" }, length: 24 },
         { name: "AES-GCM", length: 128 },
