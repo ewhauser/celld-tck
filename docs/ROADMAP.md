@@ -17,15 +17,16 @@ The suite currently pins celld v0.5.0. Upstream documentation changes independen
 | 7     | CLI and telemetry                   | CLI, trace-context, OTLP export, Parquet, and collector-outage cases implemented; retention and the bounded queue remain open | Local celld, object store, and recording OTLP collector              |
 | 8     | Containers and Sandbox              | Explicitly excluded today                                                                                                     | Separate container-runtime test environment                          |
 | 9     | Cloud qualification                 | Local MinIO coverage only                                                                                                     | Dedicated provider accounts and managed reference environment        |
+| 1     | Storage durability contracts        | Barrier, cursor, deadline, post-abort, and interrupted-replication cases implemented; cloud durability remains open         | Local workerd and celld; fault scenarios on celld                    |
 
 These are implementation priorities, not release dates. Keep workstreams independently reviewable.
 
 ## 1. Storage durability contracts
 
 - [x] Exercise `storage.sync()` after committed writes and during an open transaction.
-- [ ] Exercise `storage.sync()` after object abort with an oracle that distinguishes sync rejection from the abort itself.
+- [x] Exercise `storage.sync()` after object abort with an oracle that distinguishes sync rejection from the abort itself.
 - [x] Interrupt object storage while synchronization is pending; verify failure classification and recovery of acknowledged writes using independent evidence.
-- [ ] Interrupt peer replication during a synchronization barrier.
+- [x] Interrupt peer replication during a synchronization barrier.
 - [x] Leave a SQL write `RETURNING` cursor unfinished and test response, outbound-effect, and synchronization boundaries. Contrast with a fully consumed write cursor and an open read cursor.
 - [x] Test transaction and `blockConcurrencyWhile()` deadlines, rollback, and object reset.
 

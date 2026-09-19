@@ -2,6 +2,7 @@
 
 This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 43 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, `test:capacity`, and `test:security` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
 This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 43 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, `test:capacity`, `test:security`, and `test:telemetry` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
+This extends the API corpus and existing recovery suites to the full P0/P1/P2 checklist. Run `pnpm test:qualification` for all 36 additional scenarios, or run `test:traffic`, `test:dependencies`, `test:faults`, `test:capacity`, and `test:security` separately. Select one scenario with `--suite qualification --case <id>`. Each scenario owns a fresh three-node fleet, independent disks, MinIO, and a storage fault proxy. Cases continue after a failed scenario using new resources; failures are never automatically retried or waived.
 
 All authored TypeScript uses Effect v4 RC.115. New runtime fixtures use the same compatibility date as the API corpus. Fault scenarios assert lifecycle invariants against real celld; they are not labeled as differential workerd tests.
 
@@ -45,7 +46,7 @@ Six [in-place deployment cases](IN-PLACE-DEPLOYMENT.md) verify reload adoption a
 
 The lifecycle cases verify the documented safe-point, adoption-deadline, preservation, and module-verification contracts of celld v0.5.0. The [linked document](IN-PLACE-DEPLOYMENT.md) records the inventory those assertions rest on.
 
-Eight [storage durability cases](STORAGE-DURABILITY.md) cover explicit sync barriers, cursor output restrictions, and transaction/gate deadlines. They run in this group alongside the cases below.
+Ten [storage durability cases](STORAGE-DURABILITY.md) cover explicit sync barriers, cursor output restrictions, transaction/gate deadlines, a barrier armed across an object reset, and a barrier held open while the owner loses every peer. They run in this group alongside the cases below.
 
 - `faults.storage-latency`: delay storage forwarding by 750 ms during active writes.
 - `faults.storage-throttle`: return S3 `SlowDown`/503 responses during active writes.
