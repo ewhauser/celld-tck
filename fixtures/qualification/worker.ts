@@ -259,6 +259,13 @@ export default {
         const url = new URL(request.url);
         if (url.pathname === "/deployment/revision")
           return Response.json({ revision: "qualification-v1" });
+        // Observation only: reports how the runtime built request.url so a
+        // forwarded-header policy can be read without the fixture trusting it.
+        if (url.pathname === "/echo/url")
+          return Response.json({
+            url: request.url,
+            host: request.headers.get("host"),
+          });
         // Worker-local: a Durable Object request may execute on another node.
         if (url.pathname === "/pressure") {
           const mb = Number(url.searchParams.get("mb") ?? 16);
