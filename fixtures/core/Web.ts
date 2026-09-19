@@ -1,5 +1,32 @@
 import { Effect } from "effect";
 import { operation, platform, rejection } from "./Platform.js";
+import { encode } from "../shared/Codec.js";
+import { channelMessages, sseBody } from "../shared/Messaging.js";
+
+const hex = (bytes: ArrayBuffer) =>
+  [...new Uint8Array(bytes)]
+    .map((x) => x.toString(16).padStart(2, "0"))
+    .join("");
+const utf8 = (value: string) => new TextEncoder().encode(value);
+// JWK coordinates are unpadded base64url; the contract is the decoded byte length.
+const base64urlBytes = (value: string) =>
+  atob(value.replaceAll("-", "+").replaceAll("_", "/")).length;
+// The Workers typings give these calls a union return; the fixture selects the
+// concrete shape that the requested format or algorithm actually produces.
+const exportRaw = (key: CryptoKey) =>
+  platform(() => crypto.subtle.exportKey("raw", key) as Promise<ArrayBuffer>);
+const exportJwk = (key: CryptoKey) =>
+  platform(() => crypto.subtle.exportKey("jwk", key) as Promise<JsonWebKey>);
+// Observations that may legitimately be a value on one runtime and a rejection on
+// another keep the error name in place of the value instead of failing the request.
+const outcome = <A>(effect: Effect.Effect<A, unknown>) =>
+  effect.pipe(
+    Effect.catch((cause) =>
+      Effect.succeed(
+        (cause instanceof Error ? cause.name : "Unknown") as A | string,
+      ),
+    ),
+  );
 export const web = (request: Request) =>
   Effect.gen(function* () {
     const path = new URL(request.url).pathname;
@@ -171,10 +198,6 @@ export const web = (request: Request) =>
         const signature = yield* platform(() =>
           crypto.subtle.sign("HMAC", key, data),
         );
-        const hex = (b: ArrayBuffer) =>
-          [...new Uint8Array(b)]
-            .map((x) => x.toString(16).padStart(2, "0"))
-            .join("");
         return {
           digest: hex(digest),
           hmac: hex(signature),
@@ -213,6 +236,353 @@ export const web = (request: Request) =>
           tampered: yield* rejection(
             platform(() => crypto.subtle.decrypt(algorithm, key, corrupt)),
           ),
+        };
+      }
+      case "/web/ecdsa": {
+        const curve = { name: "ECDSA", namedCurve: "P-256" } as const;
+        const signing = { name: "ECDSA", hash: "SHA-256" } as const;
+        const pair = yield* platform(
+          () =>
+            crypto.subtle.generateKey(curve, true, [
+              "sign",
+              "verify",
+            ]) as Promise<CryptoKeyPair>,
+        );
+        const data = utf8("The quick brown fox jumps over the lazy dog");
+        const signature = yield* platform(() =>
+          crypto.subtle.sign(signing, pair.privateKey, data),
+        );
+        const jwk = yield* exportJwk(pair.publicKey);
+        const raw = yield* exportRaw(pair.publicKey);
+        const fromJwk = yield* platform(() =>
+          crypto.subtle.importKey("jwk", jwk, curve, true, ["verify"]),
+        );
+        const fromRaw = yield* platform(() =>
+          crypto.subtle.importKey("raw", raw, curve, true, ["verify"]),
+        );
+        const tampered = new Uint8Array(signature.slice(0));
+        tampered[0] = tampered[0]! ^ 1;
+        return {
+          // ECDSA signatures are randomized, so the contract is the fixed P-1363
+          // signature width plus verification of the actual signature.
+          signatureBytes: signature.byteLength,
+          verified: yield* platform(() =>
+            crypto.subtle.verify(signing, pair.publicKey, signature, data),
+          ),
+          tampered: yield* platform(() =>
+            crypto.subtle.verify(signing, pair.publicKey, tampered, data),
+          ),
+          jwkVerified: yield* platform(() =>
+            crypto.subtle.verify(signing, fromJwk, signature, data),
+          ),
+          rawVerified: yield* platform(() =>
+            crypto.subtle.verify(signing, fromRaw, signature, data),
+          ),
+          jwk: {
+            kty: jwk.kty,
+            crv: jwk.crv,
+            ext: jwk.ext,
+            keyOps: jwk.key_ops,
+            xBytes: base64urlBytes(jwk.x ?? ""),
+            yBytes: base64urlBytes(jwk.y ?? ""),
+            privateOmitted: jwk.d === undefined,
+          },
+          raw: {
+            bytes: raw.byteLength,
+            uncompressed: new Uint8Array(raw)[0] === 0x04,
+          },
+          usages: {
+            private: pair.privateKey.usages,
+            public: pair.publicKey.usages,
+          },
+          algorithm: pair.publicKey.algorithm,
+          types: [pair.privateKey.type, pair.publicKey.type],
+        };
+      }
+      case "/web/derive": {
+        const password = yield* platform(() =>
+          crypto.subtle.importKey("raw", utf8("password"), "PBKDF2", false, [
+            "deriveBits",
+            "deriveKey",
+          ]),
+        );
+        const pbkdf2 = {
+          name: "PBKDF2",
+          salt: utf8("salt"),
+          iterations: 4096,
+          hash: "SHA-256",
+        } as const;
+        // RFC 5869 test case 1 inputs; the expected output is the published vector.
+        const secret = yield* platform(() =>
+          crypto.subtle.importKey(
+            "raw",
+            new Uint8Array(22).fill(0x0b),
+            "HKDF",
+            false,
+            ["deriveBits"],
+          ),
+        );
+        const hkdf = {
+          name: "HKDF",
+          hash: "SHA-256",
+          salt: new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]),
+          info: new Uint8Array([
+            0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9,
+          ]),
+        } as const;
+        const derived = yield* platform(() =>
+          crypto.subtle.deriveKey(
+            pbkdf2,
+            password,
+            { name: "HMAC", hash: "SHA-256", length: 256 },
+            true,
+            ["sign"],
+          ),
+        );
+        return {
+          pbkdf2: hex(
+            yield* platform(() =>
+              crypto.subtle.deriveBits(pbkdf2, password, 256),
+            ),
+          ),
+          hkdf: hex(
+            yield* platform(() =>
+              crypto.subtle.deriveBits(hkdf, secret, 42 * 8),
+            ),
+          ),
+          derivedMac: hex(
+            yield* platform(() =>
+              crypto.subtle.sign("HMAC", derived, utf8("abc")),
+            ),
+          ),
+          derivedAlgorithm: derived.algorithm,
+          unalignedLength: yield* rejection(
+            platform(() => crypto.subtle.deriveBits(hkdf, secret, 7)),
+          ),
+          zeroIterations: yield* rejection(
+            platform(() =>
+              crypto.subtle.deriveBits(
+                { ...pbkdf2, iterations: 0 },
+                password,
+                256,
+              ),
+            ),
+          ),
+        };
+      }
+      case "/web/key-export": {
+        const hmac = yield* platform(() =>
+          crypto.subtle.importKey(
+            "raw",
+            utf8("key"),
+            { name: "HMAC", hash: "SHA-256" },
+            true,
+            ["sign", "verify"],
+          ),
+        );
+        const aesBytes = new Uint8Array(
+          Array.from({ length: 16 }, (_, i) => i),
+        );
+        const aes = yield* platform(() =>
+          crypto.subtle.importKey("raw", aesBytes, "AES-GCM", true, [
+            "encrypt",
+            "decrypt",
+          ]),
+        );
+        const secretJwk = (key: CryptoKey) =>
+          outcome(
+            exportJwk(key).pipe(
+              Effect.map((jwk) => ({
+                kty: jwk.kty,
+                alg: jwk.alg,
+                keyOps: jwk.key_ops,
+                ext: jwk.ext,
+                k: jwk.k,
+              })),
+            ),
+          );
+        const imported = yield* platform(() =>
+          crypto.subtle.importKey(
+            "jwk",
+            { kty: "oct", k: "AAECAwQFBgcICQoLDA0ODw", ext: true },
+            "AES-GCM",
+            true,
+            ["encrypt"],
+          ),
+        );
+        return {
+          hmacRaw: [...new Uint8Array(yield* exportRaw(hmac))],
+          aesRaw: [...new Uint8Array(yield* exportRaw(aes))],
+          hmacJwk: yield* secretJwk(hmac),
+          aesJwk: yield* secretJwk(aes),
+          jwkImported: [...new Uint8Array(yield* exportRaw(imported))],
+          algorithms: [hmac.algorithm, aes.algorithm],
+        };
+      }
+      case "/web/crypto-invalid": {
+        const verifyOnly = yield* platform(() =>
+          crypto.subtle.importKey(
+            "raw",
+            utf8("key"),
+            { name: "HMAC", hash: "SHA-256" },
+            false,
+            ["verify"],
+          ),
+        );
+        const opaque = yield* platform(() =>
+          crypto.subtle.importKey("raw", new Uint8Array(16), "AES-GCM", false, [
+            "encrypt",
+          ]),
+        );
+        return {
+          wrongUsage: yield* rejection(
+            platform(() =>
+              crypto.subtle.sign("HMAC", verifyOnly, new Uint8Array(1)),
+            ),
+          ),
+          unknownAlgorithm: yield* rejection(
+            platform(() =>
+              crypto.subtle.importKey(
+                "raw",
+                new Uint8Array(16),
+                { name: "AES-NOPE" },
+                false,
+                ["encrypt"],
+              ),
+            ),
+          ),
+          unknownHash: yield* rejection(
+            platform(() => crypto.subtle.digest("SHA-42", new Uint8Array(1))),
+          ),
+          badKeyLength: yield* rejection(
+            platform(() =>
+              crypto.subtle.importKey(
+                "raw",
+                new Uint8Array(17),
+                "AES-GCM",
+                false,
+                ["encrypt"],
+              ),
+            ),
+          ),
+          malformedJwk: yield* rejection(
+            platform(() =>
+              crypto.subtle.importKey(
+                "jwk",
+                { kty: "EC", crv: "P-256", x: "!!!", y: "!!!" },
+                { name: "ECDSA", namedCurve: "P-256" },
+                false,
+                ["verify"],
+              ),
+            ),
+          ),
+          emptyUsages: yield* rejection(
+            platform(() =>
+              crypto.subtle.importKey(
+                "raw",
+                new Uint8Array(16),
+                "AES-GCM",
+                false,
+                [],
+              ),
+            ),
+          ),
+          mismatchedUsage: yield* rejection(
+            platform(() =>
+              crypto.subtle.importKey(
+                "raw",
+                new Uint8Array(16),
+                "AES-GCM",
+                false,
+                ["sign"],
+              ),
+            ),
+          ),
+          nonExtractable: yield* rejection(
+            platform(() => crypto.subtle.exportKey("raw", opaque)),
+          ),
+          emptyIv: yield* rejection(
+            platform(() =>
+              crypto.subtle.encrypt(
+                { name: "AES-GCM", iv: new Uint8Array(0) },
+                opaque,
+                new Uint8Array(1),
+              ),
+            ),
+          ),
+        };
+      }
+      case "/messaging/channel": {
+        const channel = new MessageChannel();
+        const sent = channelMessages();
+        const received: unknown[] = [];
+        const delivered = new Promise<void>((resolve) => {
+          channel.port2.onmessage = (event: MessageEvent) => {
+            received.push(event.data);
+            if (received.length === sent.length) resolve();
+          };
+        });
+        for (const message of sent) channel.port1.postMessage(message);
+        // Nothing is delivered synchronously: ports queue until the task yields.
+        const synchronous = received.length;
+        yield* platform(() => delivered);
+        const unserializable = yield* rejection(
+          operation(() => channel.port1.postMessage(() => 1)),
+        );
+        channel.port2.close();
+        const afterClose = yield* rejection(
+          operation(() => channel.port1.postMessage("late")),
+        );
+        yield* platform(() => scheduler.wait(10));
+        return {
+          synchronous,
+          messages: encode(received),
+          unserializable,
+          afterClose,
+          droppedAfterClose: received.length === sent.length,
+        };
+      }
+      case "/messaging/event-source": {
+        const source = EventSource.from(new Response(sseBody()).body!);
+        const events: {
+          type: string;
+          data: string;
+          lastEventId: string;
+        }[] = [];
+        const trace: string[] = [];
+        const record = (event: Event) => {
+          const message = event as MessageEvent;
+          events.push({
+            type: message.type,
+            data: message.data as string,
+            lastEventId: message.lastEventId,
+          });
+        };
+        yield* platform(
+          () =>
+            new Promise<void>((resolve) => {
+              source.addEventListener("open", () => trace.push("open"));
+              source.addEventListener("greeting", record);
+              source.addEventListener("message", record);
+              source.addEventListener("error", () => {
+                trace.push("error");
+                resolve();
+              });
+            }),
+        );
+        const exhausted = source.readyState;
+        source.close();
+        return {
+          events,
+          trace,
+          exhausted,
+          closed: source.readyState,
+          states: [
+            EventSource.CONNECTING,
+            EventSource.OPEN,
+            EventSource.CLOSED,
+          ],
+          withCredentials: source.withCredentials,
         };
       }
       case "/web/html": {
