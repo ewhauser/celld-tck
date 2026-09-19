@@ -10,6 +10,7 @@ The two original failing TCK cases reduce to three independently actionable repo
 4. [EC public key export returns SPKI for the raw format and omits JWK metadata](webcrypto-ec-key-export.md).
 5. [SubtleCrypto does not enforce key usages or key lengths](webcrypto-input-validation.md).
 6. [`node:stream` Readable.toWeb/fromWeb throw TypeError](node-stream-web-interop.md).
+7. [`websocket_standard_binary_type` is not applied](websocket-standard-binary-type.md), observed in `tck-fe61abc7-a30e-41b9-96d7-ca3a68a09757`; reproduce it with `pnpm tck --profile local --suite flags`.
 
 Reports 4 to 6 were found by the runtime API cases in the regular `core` and `node` suites, not by the isolated `repros` fixture. Reproduce them with `pnpm tck --profile local --suite core --case crypto.ecdsa-p256`, `--suite core --case crypto.invalid-input` (evidence run `tck-0c3c37cf-d018-4e54-b741-aeec138d7628`), and `--suite node --case node.stream-timers` (evidence run `tck-3168c226-4b59-4847-b179-739fd47fa9f7`). Their source investigation is not pinned to an upstream commit.
 
