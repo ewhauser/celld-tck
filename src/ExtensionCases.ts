@@ -1,6 +1,16 @@
+import { Effect } from "effect";
 import { endpoint } from "./CoreCases.js";
+import { define, response } from "./Cases.js";
+import { Transport, type Target } from "./Domain.js";
 const assetDoc = "https://developers.cloudflare.com/workers/static-assets/";
 const loaderDoc = "https://developers.cloudflare.com/dynamic-workers/";
+// Static routing is decided by the platform before any fixture code runs, so
+// these observations come from the public listener rather than a binding.
+const direct = (target: Target, path: string) =>
+  Effect.gen(function* () {
+    const transport = yield* Transport;
+    return yield* transport.request(target, { path });
+  });
 export const extensionCases = [
   endpoint(
     "wasm.module",
@@ -84,6 +94,29 @@ export const extensionCases = [
     },
     `${assetDoc}routing/advanced/redirects/`,
   ),
+  {
+    ...define(
+      "assets.worker-first",
+      (target) =>
+        Effect.gen(function* () {
+          // A Worker route and an asset exist at both paths; only the static
+          // routing rules decide which one answers.
+          return [
+            yield* direct(target, "/shadowed.txt"),
+            yield* direct(target, "/asset-first/note.txt"),
+          ];
+        }),
+      () => [
+        response({ served: "worker", path: "/shadowed.txt" }),
+        {
+          status: 200,
+          headers: { "content-type": "text/plain; charset=utf-8" },
+          body: "asset-first λ\n",
+        },
+      ],
+    ),
+    contract: `${assetDoc}binding/#run_worker_first`,
+  },
   endpoint(
     "dynamic.fetch",
     "/dynamic/fetch",
@@ -113,6 +146,22 @@ export const extensionCases = [
       gateway: { global: "gateway /global", binding: "gateway /binding" },
     },
     `${loaderDoc}usage/egress-control/`,
+  ),
+  endpoint(
+    "dynamic.limits",
+    "/dynamic/limits",
+    { token: "limited λ", count: 1, upstream: "gateway /binding" },
+    `${loaderDoc}usage/limits/`,
+  ),
+  endpoint(
+    "facets.outbound-transaction",
+    "/facets/outbound",
+    {
+      control: { balance: 40, outbound: "gateway /facet" },
+      inTransaction: { balance: 40, outbound: "gateway /facet" },
+      after: { balance: 40 },
+    },
+    "https://celld.dev/docs/cloudflare-compat/#durable-object-facets",
   ),
   endpoint(
     "facets.isolation",

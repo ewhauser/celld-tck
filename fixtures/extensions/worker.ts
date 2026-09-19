@@ -80,6 +80,41 @@ export class Probe extends BaseProbe {
           this.ctx.facets.get(name, () => ({
             class: worker.getDurableObjectClass(className),
           }));
+        if (url.pathname === "/facets/outbound") {
+          // The facet needs its own outbound capability, so this loaded Worker
+          // carries the gateway in its env.
+          const outboundWorker = env.LOADER.get(
+            "facet-outbound-v1",
+            code({ env: { UPSTREAM: env.GATEWAY } }),
+          );
+          const ledger = (op: string) =>
+            platform(() =>
+              this.ctx.facets
+                .get("outbound", () => ({
+                  class: outboundWorker.getDurableObjectClass("Ledger"),
+                }))
+                .fetch(`https://fixture.test/?op=${op}`),
+            ).pipe(
+              Effect.flatMap((response) => platform(() => response.json())),
+            );
+          const control = yield* ledger("outbound");
+          const storage = this.ctx.storage;
+          const inTransaction = yield* platform(() =>
+            storage.transaction(async (tx) => {
+              await tx.put("root", "pending");
+              return Effect.runPromise(ledger("outbound"));
+            }),
+          ).pipe(
+            // A refusal is reported as an outcome; its error class is not part
+            // of the documented contract.
+            Effect.catch(() => Effect.succeed("rejected")),
+          );
+          return Response.json({
+            control,
+            inTransaction,
+            after: yield* ledger("read"),
+          });
+        }
         if (url.pathname === "/facets/transaction") {
           const ledger = (op: string) =>
             platform(() =>
@@ -167,6 +202,18 @@ export default {
                 },
               }),
             );
+          // Custom resource limits declared in WorkerCode. The pinned workerd
+          // does not enforce them locally, so only acceptance and a call that
+          // stays inside the declared budget are observed.
+          case "/dynamic/limits":
+            return Response.json(
+              yield* child(env, "limits-v1", "/env", {
+                extra: {
+                  limits: { cpuMs: 200, subRequests: 5 },
+                  env: { TOKEN: "limited λ", COUNT: 1, UPSTREAM: env.GATEWAY },
+                },
+              }),
+            );
           case "/dynamic/outbound":
             return Response.json({
               blocked: yield* child(env, "outbound-blocked-v1", "/outbound", {
@@ -204,6 +251,11 @@ export default {
               folderSlash: yield* asset(env, "/folder/"),
               missing: yield* asset(env, "/missing"),
             });
+          // Reachable only when static routing sends the path to the Worker:
+          // an asset exists at /shadowed.txt and at /asset-first/note.txt.
+          case "/shadowed.txt":
+          case "/asset-first/note.txt":
+            return Response.json({ served: "worker", path: url.pathname });
           case "/assets/redirects":
             return Response.json({
               permanent: yield* asset(env, "/old-page"),

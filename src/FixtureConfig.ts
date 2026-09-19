@@ -70,7 +70,23 @@ export const FixtureConfig = Schema.Struct({
     Schema.Struct({
       directory: Schema.String,
       binding: Schema.String,
-      run_worker_first: Schema.Boolean,
+      // Wrangler accepts `true`/`false` or an array of route patterns, where a
+      // `!/`-prefixed pattern keeps the default asset-first order for a path.
+      run_worker_first: Schema.Union([
+        Schema.Boolean,
+        Schema.Array(Schema.String),
+      ]),
+      html_handling: Schema.optionalKey(
+        Schema.Literals([
+          "auto-trailing-slash",
+          "force-trailing-slash",
+          "drop-trailing-slash",
+          "none",
+        ]),
+      ),
+      not_found_handling: Schema.optionalKey(
+        Schema.Literals(["single-page-application", "404-page", "none"]),
+      ),
     }),
   ),
   worker_loaders: Schema.optionalKey(

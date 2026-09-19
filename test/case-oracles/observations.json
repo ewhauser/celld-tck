@@ -49,6 +49,10 @@
     {
       "runId": "tck-0c3c37cf-d018-4e54-b741-aeec138d7628",
       "sourceRevision": "0b59e3217d67aa00e2b887a0de4ca83fc26c0c52"
+    },
+    {
+      "runId": "tck-9bfff958-d432-4206-8a3f-942cb5ffc715",
+      "sourceRevision": "afe5550ff0ccc11a1cdfaeff6ea5ed7b465766d5"
     }
   ],
   "cases": {
@@ -1822,6 +1826,25 @@
         }
       }
     },
+    "assets.worker-first": [
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "served": "worker",
+          "path": "/shadowed.txt"
+        }
+      },
+      {
+        "status": 200,
+        "headers": {
+          "content-type": "text/plain; charset=utf-8"
+        },
+        "body": "asset-first λ\n"
+      }
+    ],
     "dynamic.props": {
       "status": 200,
       "headers": {
@@ -1869,6 +1892,17 @@
         }
       }
     },
+    "dynamic.limits": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "token": "limited λ",
+        "count": 1,
+        "upstream": "gateway /binding"
+      }
+    },
     "facets.transaction": {
       "status": 200,
       "headers": {
@@ -1892,6 +1926,25 @@
         },
         "restored": {
           "balance": 20
+        }
+      }
+    },
+    "facets.outbound-transaction": {
+      "status": 200,
+      "headers": {
+        "content-type": "application/json"
+      },
+      "body": {
+        "control": {
+          "balance": 40,
+          "outbound": "gateway /facet"
+        },
+        "inTransaction": {
+          "balance": 40,
+          "outbound": "gateway /facet"
+        },
+        "after": {
+          "balance": 40
         }
       }
     },
