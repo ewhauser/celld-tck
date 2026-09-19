@@ -49,7 +49,9 @@ it.effect(
                   stdout: JSON.stringify([
                     {
                       Id: node,
+                      Image: `sha256:${node}`,
                       Config: {
+                        Image: "ghcr.io/denoland/celld:v0.5.0",
                         Labels: {
                           "com.docker.compose.project": "tck-owned",
                           "com.docker.compose.service": node,

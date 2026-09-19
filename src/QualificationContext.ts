@@ -1,12 +1,15 @@
 import { pollUntil, waitForReady } from "./Polling.js";
 import { Effect, Schema } from "effect";
-import { Artifacts } from "./Artifacts.js";
+import { Artifacts, decodeJson } from "./Artifacts.js";
 import {
   attemptRequest,
   leaseLapse,
+  TckError,
   Transport,
   type Target,
 } from "./Domain.js";
+import type { Probe } from "./SecurityProbe.js";
+import { ProbeResult } from "./SecurityOracles.js";
 import type { acquireLocal } from "./Local.js";
 import { equal } from "./Oracle.js";
 import {
@@ -78,25 +81,36 @@ export const makeContext = (
     const owner = () => fleet.owner(identity.cell);
     const ledger = yield* makeLedger(name);
     let nextId = 0;
-    const write = (node: Node = "celld") =>
+    /**
+     * One ledgered write, reporting what was observed rather than only whether
+     * it was acknowledged: an operational scenario has to say which request it
+     * sent, when, and how it ended.
+     *
+     * `delayMs` holds the request open inside the owning object before it
+     * commits, so an operation can be started while this write is in flight.
+     */
+    const attemptWrite = (node: Node = "celld", delayMs = 0) =>
       Effect.gen(function* () {
         const id = `${name}-${++nextId}`;
         const payload = `payload:${seed}:${id}:λ`;
+        const startedAtMs = Date.now();
         yield* ledger.append({
           kind: "intent",
           id,
           payload,
-          at: Date.now(),
+          at: startedAtMs,
           node,
         });
         const result = yield* attemptRequest(
           request(
-            "/history/write",
+            delayMs > 0 ? `/history/write?delay=${delayMs}` : "/history/write",
             node,
             "POST",
             JSON.stringify({ id, payload }),
           ),
         );
+        const completedAtMs = Date.now();
+        const base = { id, payload, node, startedAtMs, completedAtMs };
         if (
           "response" in result &&
           result.response.status >= 200 &&
@@ -113,20 +127,35 @@ export const makeContext = (
           yield* ledger.append({
             kind: "ack",
             ...receipt,
-            at: Date.now(),
+            at: completedAtMs,
             node,
           });
-          return true;
+          return {
+            ...base,
+            acknowledged: true,
+            status: result.response.status,
+            receiptId: receipt.id,
+          };
         }
         yield* ledger.append({
           kind: "uncertain",
           id,
           payload,
-          at: Date.now(),
+          at: completedAtMs,
           node,
         });
-        return false;
+        return {
+          ...base,
+          acknowledged: false,
+          ...("response" in result
+            ? { status: result.response.status }
+            : { error: result.error }),
+        };
       });
+    const write = (node: Node = "celld", delayMs = 0) =>
+      attemptWrite(node, delayMs).pipe(
+        Effect.map((result) => result.acknowledged),
+      );
     const state = (node: Node = "celld") =>
       readHistory((path) => json(path, node));
     const verify = (node: Node = "celld") =>
@@ -197,8 +226,8 @@ export const makeContext = (
         yield* leaseLapse;
         yield* startAll();
       });
-    const writeAcknowledged = (node: Node = "celld") =>
-      write(node).pipe(Effect.flatMap((ack) => equal(ack, true)));
+    const writeAcknowledged = (node: Node = "celld", delayMs = 0) =>
+      write(node, delayMs).pipe(Effect.flatMap((ack) => equal(ack, true)));
     const poll = <A>(
       effect: Effect.Effect<A, unknown>,
       done: (a: A) => boolean,
@@ -228,6 +257,7 @@ export const makeContext = (
       owner,
       ledger,
       write,
+      attemptWrite,
       writeAcknowledged,
       state,
       verify,
@@ -241,6 +271,41 @@ export const makeContext = (
       proxy,
       transport,
     };
+  });
+
+/**
+ * Runs probes inside the sidecar container. celld's peer and operator listener
+ * is never published to the host, so this is the only way to reach it, and the
+ * sidecar is also where a raw request line or a streamed body can be produced.
+ * The probe asserts nothing; pure oracles classify every observation.
+ */
+export const sidecarProbe = (
+  ctx: QualificationContext,
+  name: string,
+  probes: readonly Probe[],
+) =>
+  Effect.gen(function* () {
+    const output = yield* ctx.runtime.controls.compose([
+      "exec",
+      "-T",
+      "proxy",
+      "node",
+      "/fixture/security-probe.mjs",
+      JSON.stringify(probes),
+    ]);
+    yield* ctx.artifacts.json(`${name}-requests.json`, probes);
+    yield* ctx.artifacts.text(`${name}-probes.jsonl`, output.stdout);
+    const results: ProbeResult[] = [];
+    for (const line of output.stdout.split("\n"))
+      if (line.trim()) results.push(yield* decodeJson(ProbeResult, line));
+    if (results.length !== probes.length)
+      return yield* Effect.fail(
+        new TckError({
+          phase: "probe",
+          message: `Expected ${probes.length} observations, saw ${results.length}`,
+        }),
+      );
+    return results as readonly ProbeResult[];
   });
 
 export const events = (ctx: QualificationContext) =>
