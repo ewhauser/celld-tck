@@ -31,6 +31,7 @@
     "test:capacity": "tsx src/main.ts --profile local --suite capacity",
     "test:security": "tsx src/main.ts --profile local --suite security",
     "test:telemetry": "tsx src/main.ts --profile local --suite telemetry",
+    "test:operations": "tsx src/main.ts --profile local --suite operations",
     "site:build": "tsx src/site/main.ts"
   },
   "dependencies": {
