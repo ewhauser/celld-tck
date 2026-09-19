@@ -29,6 +29,7 @@
     "test:dependencies": "tsx src/main.ts --profile local --suite dependencies",
     "test:faults": "tsx src/main.ts --profile local --suite faults",
     "test:capacity": "tsx src/main.ts --profile local --suite capacity",
+    "test:security": "tsx src/main.ts --profile local --suite security",
     "site:build": "tsx src/site/main.ts"
   },
   "dependencies": {

@@ -53,6 +53,8 @@ export type LocalOptions = {
       nodeCount: 3;
       durability: "bucket" | "fleet";
       qualification: true;
+      /** Adds the security-boundary overlay and the in-network probe binary. */
+      security?: boolean;
     }
 );
 
@@ -63,6 +65,10 @@ export const acquireLocal = (options: LocalOptions) =>
     const nodeCount = options.topology === "cluster" ? options.nodeCount : 2;
     const durability = options.durability ?? "bucket";
     const qualification = options.qualification ?? false;
+    const security =
+      options.topology === "cluster" && options.qualification === true
+        ? (options.security ?? false)
+        : false;
     const wantsDeploymentChecks =
       options.topology === "single" && (options.deploymentChecks ?? false);
     const processes = yield* Processes;
@@ -104,6 +110,7 @@ export const acquireLocal = (options: LocalOptions) =>
         ["fleet.yaml", durability === "fleet"],
         ["three-node.yaml", multiNode && nodeCount === 3],
         ["qualification.yaml", qualification],
+        ["security.yaml", security],
         ["manual-reload.yaml", options.manualReload ?? false],
       ] as const
     )
@@ -129,18 +136,27 @@ export const acquireLocal = (options: LocalOptions) =>
         overlay.name,
         yield* fs.readFileString(overlay.path),
       );
-    yield* Effect.tryPromise({
-      try: () =>
-        build({
-          entryPoints: [new URL("./StorageProxy.ts", import.meta.url).pathname],
-          bundle: true,
-          platform: "node",
-          format: "esm",
-          outfile: resolve(bundle.directory, "proxy.mjs"),
-        }),
-      catch: (error) =>
-        new TckError({ phase: "build", message: String(error) }),
-    });
+    // Sidecar programs live beside the fixture so the sidecar's read-only bind
+    // mount can reach them; the security probe is built only when needed.
+    const sidecars = [
+      { entry: "./StorageProxy.ts", out: "proxy.mjs" },
+      ...(security
+        ? [{ entry: "./SecurityProbe.ts", out: "security-probe.mjs" }]
+        : []),
+    ];
+    for (const sidecar of sidecars)
+      yield* Effect.tryPromise({
+        try: () =>
+          build({
+            entryPoints: [new URL(sidecar.entry, import.meta.url).pathname],
+            bundle: true,
+            platform: "node",
+            format: "esm",
+            outfile: resolve(bundle.directory, sidecar.out),
+          }),
+        catch: (error) =>
+          new TckError({ phase: "build", message: String(error) }),
+      });
     return yield* owned(
       Effect.gen(function* () {
         yield* compose(["up", "-d", "minio"]);

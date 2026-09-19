@@ -6,17 +6,17 @@ The suite currently pins celld v0.5.0. Upstream documentation changes independen
 
 ## Priorities
 
-| Order | Workstream                          | Starting point                                                                               | Environment                                                          |
-| ----- | ----------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| 1     | Storage durability contracts        | Barrier, cursor, and deadline cases implemented; post-abort sync remains open                | Local workerd and celld; fault scenarios on celld                    |
-| 2     | In-place deployment                 | Explicit reload and invalid-replacement cases implemented; lifecycle transitions remain open | Local celld fleet                                                    |
-| 3     | Security boundaries                 | No dedicated boundary suite                                                                  | Isolated local celld fleet                                           |
-| 4     | Assets, dynamic Workers, and facets | One API case per feature                                                                     | Local reference and candidate, with celld recovery scenarios         |
-| 5     | Runtime and service breadth         | Representative cases, not comprehensive API coverage                                         | Local where possible; controlled network/clock fixtures where needed |
-| 6     | Fleet operations and upgrades       | Failover and bounded capacity tests exist                                                    | Local multi-node fleet and explicitly selected binary versions       |
-| 7     | CLI and telemetry                   | No dedicated end-to-end suites                                                               | Local celld, object store, and test collector                        |
-| 8     | Containers and Sandbox              | Explicitly excluded today                                                                    | Separate container-runtime test environment                          |
-| 9     | Cloud qualification                 | Local MinIO coverage only                                                                    | Dedicated provider accounts and managed reference environment        |
+| Order | Workstream                          | Starting point                                                                                                              | Environment                                                          |
+| ----- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 1     | Storage durability contracts        | Barrier, cursor, and deadline cases implemented; post-abort sync remains open                                               | Local workerd and celld; fault scenarios on celld                    |
+| 2     | In-place deployment                 | Explicit reload and invalid-replacement cases implemented; lifecycle transitions remain open                                | Local celld fleet                                                    |
+| 3     | Security boundaries                 | Listener, reserved-class, forwarded-header, and body-limit cases implemented; peer credential ageing and replay remain open | Isolated local celld fleet                                           |
+| 4     | Assets, dynamic Workers, and facets | One API case per feature                                                                                                    | Local reference and candidate, with celld recovery scenarios         |
+| 5     | Runtime and service breadth         | Representative cases, not comprehensive API coverage                                                                        | Local where possible; controlled network/clock fixtures where needed |
+| 6     | Fleet operations and upgrades       | Failover and bounded capacity tests exist                                                                                   | Local multi-node fleet and explicitly selected binary versions       |
+| 7     | CLI and telemetry                   | No dedicated end-to-end suites                                                                                              | Local celld, object store, and test collector                        |
+| 8     | Containers and Sandbox              | Explicitly excluded today                                                                                                   | Separate container-runtime test environment                          |
+| 9     | Cloud qualification                 | Local MinIO coverage only                                                                                                   | Dedicated provider accounts and managed reference environment        |
 
 These are implementation priorities, not release dates. Keep workstreams independently reviewable.
 
@@ -48,11 +48,13 @@ Record the revision that handled each request and validate retained state. This 
 
 ## 3. Security boundaries
 
-- [ ] Verify that operator and peer endpoints are inaccessible through the public listener and unknown internal paths do not invoke application code.
-- [ ] Reject missing, forged, expired, and replayed peer authentication using controlled test credentials.
-- [ ] Verify reserved runtime classes cannot be reached through unauthenticated ordinary-object routes.
-- [ ] Test forwarded-header policy and malformed host handling with and without a trusted proxy configuration.
-- [ ] Enforce request-body limits for declared and streamed oversized bodies.
+- [x] Verify that operator and peer endpoints are inaccessible through the public listener and unknown internal paths do not invoke application code.
+- [ ] Reject missing, forged, expired, and replayed peer authentication using controlled test credentials. Missing and forged are covered. Expired and replayed remain open: both need a _valid_ credential to age or resend, and v0.5.0 documents neither the canonical signing input for `cells-peer-request-v1` nor any supported way to mint, inject, or capture a test credential.
+- [x] Verify reserved runtime classes cannot be reached through unauthenticated ordinary-object routes.
+- [x] Test forwarded-header policy and malformed host handling with and without a trusted proxy configuration. Rejection of _noncanonical_ hosts remains unasserted: the published wording does not define the term, and the likeliest forms — an uppercase host and a trailing-dot host — are accepted on v0.5.0.
+- [x] Enforce request-body limits for declared and streamed oversized bodies.
+
+Implemented coverage, the v0.5.0 listener/route/credential inventory it rests on, and the untestable items are in [SECURITY-BOUNDARIES.md](SECURITY-BOUNDARIES.md).
 
 Each denial case needs an authorized control and an assertion that no protected state changed. This verifies documented boundaries; it is not a claim of hostile multi-tenant isolation.
 
