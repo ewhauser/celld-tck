@@ -41,7 +41,12 @@ const inputFor = (
   seed: corpus.seed,
   namespace: "oracle-mutations",
   compatibilityDate: corpus.compatibilityDate,
-  compatibilityFlags: test.fixture === "node" ? ["nodejs_compat"] : [],
+  compatibilityFlags:
+    test.fixture === "node"
+      ? ["nodejs_compat"]
+      : test.fixture === "flags"
+        ? ["delete_all_preserves_alarm", "no_websocket_standard_binary_type"]
+        : [],
 });
 // Replace only acquisition of observations. These are the actual registered
 // check/compare/divergence functions, including independent semantic invariants.
@@ -188,6 +193,10 @@ const knownBugMutations: Record<string, Mutation> = {
   "node.stream-timers": {
     name: "a conforming timer result breaks alongside the known bug",
     changes: [{ path: ["body", "race"], value: "slow" }],
+  },
+  "flags.enabled-defaults": {
+    name: "the still-honored deleteAll switch breaks alongside the known bug",
+    changes: [{ path: ["body", "deleteAll", "alarmPresent"], value: true }],
   },
   "repro.body-readers": {
     name: "fresh body is already marked used",

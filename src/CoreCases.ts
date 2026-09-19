@@ -508,4 +508,25 @@ export const coreCases: ReadonlyArray<TestCase> = [
     contract:
       "https://developers.cloudflare.com/durable-objects/api/websockets/",
   },
+  endpoint(
+    "websocket.outbound-close",
+    "/websocket/outbound",
+    {
+      echo: { type: "message", data: "echo:ping λ" },
+      closed: { type: "close", code: 4001, reason: "server λ", clean: true },
+      readyState: 3,
+      // The reserved code 1005 is outside the ranges close() accepts.
+      invalidCode: "InvalidAccessError",
+    },
+    webDoc + "websockets/",
+  ),
+  endpoint(
+    "websocket.concurrent-sockets",
+    "/websocket/concurrent",
+    {
+      echoes: Array.from({ length: 16 }, (_, i) => `echo:n${i}`).sort(),
+      open: 16,
+    },
+    webDoc + "websockets/",
+  ),
 ];

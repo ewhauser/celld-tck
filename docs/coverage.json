@@ -99,34 +99,44 @@
     },
     {
       "family": "websocket",
-      "cases": ["websocket.protocol-attachment"]
+      "cases": [
+        "websocket.protocol-attachment",
+        "websocket.outbound-close",
+        "websocket.concurrent-sockets"
+      ]
+    },
+    {
+      "family": "flags",
+      "cases": ["flags.enabled-defaults", "flags.disabled-counterparts"]
     },
     {
       "family": "kv",
-      "cases": ["kv.metadata-list", "kv.binary-pagination"]
+      "cases": ["kv.metadata-list", "kv.binary-pagination", "kv.expiration"]
     },
     {
       "family": "d1",
-      "cases": ["d1.bindings-results", "d1.batch-rollback"]
+      "cases": ["d1.bindings-results", "d1.batch-rollback", "d1.exec-batch"]
     },
     {
       "family": "r2",
       "cases": [
         "r2.metadata-range-delete",
         "r2.conditional-write",
-        "r2.multipart"
+        "r2.multipart",
+        "r2.list-options"
       ]
     },
     {
       "family": "queues",
-      "cases": ["queues.batch-ack-retry"]
+      "cases": ["queues.batch-ack-retry", "queues.retry-delay"]
     },
     {
       "family": "workflows",
       "cases": [
         "workflows.steps-sleep-result",
         "workflows.retry",
-        "workflows.event"
+        "workflows.event",
+        "workflows.timeout"
       ]
     },
     {
@@ -192,7 +202,7 @@
     },
     {
       "family": "Cron, TCP/TLS, and managed Cloudflare service guarantees",
-      "reason": "Require a clock-controlled or externally reachable reference environment; not established by Miniflare API emulation."
+      "reason": "Require a clock-controlled or externally reachable reference environment; not established by Miniflare API emulation. Miniflare has no scheduler and celld v0.5.0 exposes no scheduled trigger, so cron has no shared triggering mechanism; TLS certificate validation needs a publicly trusted certificate neither runtime can be given locally. See RUNTIME-BREADTH.md."
     },
     {
       "family": "PITR",

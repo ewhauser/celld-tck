@@ -15,6 +15,9 @@ export const rejectionConfigs = [
     patch: { vectorize: [{ binding: "VECTOR", index_name: "test" }] },
     diagnostic: "does not support these config keys: vectorize",
   },
+  // A compatibility switch paired with its own disable counterpart is not
+  // registered here: celld v0.5.0 accepts it at deploy time. See
+  // RUNTIME-BREADTH.md for the reproduction and the workerd contrast.
   {
     id: "deployment.invalid-name",
     patch: { name: "INVALID_NAME" },

@@ -82,7 +82,7 @@ export interface TestCase {
     readonly owner: string;
     readonly check: (value: unknown) => Effect.Effect<void, TckError>;
   };
-  readonly fixture?: "core" | "node" | "extensions" | "repro";
+  readonly fixture?: "core" | "node" | "flags" | "extensions" | "repro";
   readonly id: string;
   readonly contract: string;
   readonly run: (

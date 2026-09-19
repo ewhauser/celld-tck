@@ -28,6 +28,7 @@ Use the name, ledger, and current endpoint from the run evidence. This command d
 - `dependencies.workflow-recovery`: persist a completed step, stop while waiting for an event, recover, deliver the event, and require both steps' effects and returned results exactly once in this schedule.
 - `dependencies.stream-reconnect`: retain a client cursor, interrupt an active ordered stream with owner failure, reconnect from that cursor, and require the exact full sequence and payloads without gaps or duplicates.
 - `dependencies.hibernation`: keep one WebSocket connected, explicitly evict its owning DO through celld's internal lifecycle endpoint, and require a changed activation token plus continued attachment state on the same socket.
+- `dependencies.socket-failover`: hold three WebSockets open, kill the owning node, and require every socket to end without a clean close and without serving another frame, then require a reconnection on a new activation and the acknowledged write history intact. celld documents that a WebSocket transport cannot move to a new cell owner, so this asserts the forced close and the client's reconnection, not transport survival.
 
 Named service RPC is covered by the API corpus and checked again after each node rolls to a new fixture revision. Application streams here are a persisted ordered append feed; adapt that contract if your application uses different cursor or acknowledgment semantics. Hibernation means an eviction with a surviving connection, not a process restart.
 
