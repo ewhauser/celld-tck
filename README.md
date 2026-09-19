@@ -107,6 +107,7 @@ Every new case needs a meaningful negative example that its actual checker rejec
 - [Dashboard publishing and local previews](docs/DASHBOARD.md)
 - [Coverage roadmap](docs/ROADMAP.md) and [qualification backlog](docs/BACKLOG.md)
 - [In-place deployment coverage](docs/IN-PLACE-DEPLOYMENT.md)
+- [Assets, dynamic Workers, and facets](docs/EXTENSIONS.md)
 
 ## License
 

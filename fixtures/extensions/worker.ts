@@ -39,12 +39,18 @@ const asset = (env: ExtensionEnv, path: string) =>
     Effect.flatMap((response) =>
       Effect.gen(function* () {
         const body = yield* platform(() => response.text());
+        // The bytes and media type of an error page are presentation, not
+        // contract, so only a served asset reports them.
         return {
           status: response.status,
           location: response.headers.get("location"),
-          contentType: response.headers.get("content-type"),
           page: response.headers.get("x-tck-page"),
-          body: body.trim(),
+          ...(response.ok
+            ? {
+                contentType: response.headers.get("content-type"),
+                body: body.trim(),
+              }
+            : { contentType: null, body: null }),
         };
       }),
     ),
