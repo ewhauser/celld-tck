@@ -8,6 +8,10 @@ The two original failing TCK cases reduce to three independently actionable repo
 2. [Invalid storage list limits throw the wrong error class](storage-list-validation.md).
 3. [Uncloneable storage values throw TypeError instead of DataCloneError](storage-clone-errors.md).
 
+A later report came from the extensions suite rather than the repro fixture:
+
+4. [Static assets do not serve a directory index for a trailing-slash path](asset-directory-index.md), observed in `tck-61e8bd92-7c94-40b3-a868-a9fa40881eec`. It has no source investigation; reproduce it with `pnpm tck --profile local --suite extensions --case assets.html-routing`.
+
 The source investigation is pinned to upstream commit `12d5b6333fe52717325addcfe1e99e9fd4f77bcd`. Live GitHub checks confirmed that commit was still `main` and v0.5.0 was still the latest release. Targeted issue searches for body consumption/bodyUsed/DataCloneError and storage TypeError did not find a matching report; that is not an exhaustive duplicate guarantee. No messages, issues, or PRs have been sent upstream.
 
 ## Reproduce

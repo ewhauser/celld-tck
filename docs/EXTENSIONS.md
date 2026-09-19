@@ -46,6 +46,12 @@ pnpm tck --profile reference --suite extensions --case assets.redirects
 
 Each case has an independently captured positive observation in `test/case-oracles/observations.json` and named semantic mutations in `test/case-oracles/Mutations.ts`: a lost `_headers` rule, an ignored `_redirects` rule, a suppressed trailing-slash redirect, leaked props, a lost env capability, an outbound block that leaks or that also disables bindings, and a facet transaction that commits a rolled back write or discards a committed one.
 
+An asset error page's body and media type are presentation rather than contract, so only a served asset reports them; the not-found status itself is asserted.
+
+## Local celld results
+
+On celld v0.5.0 every case above passes except `assets.html-routing`, which is registered as the known bug [CELL-004](BUGS.md): celld redirects `/folder` to `/folder/` and then answers 404 for that canonical path, so a directory index is unreachable. Every other observation in that case matches the reference. No divergence was needed for these cases; the compatibility page documents no difference in asset routing, dynamic Worker props/env/outbound handling, or facet transactions.
+
 ## Remaining coverage
 
 These cases do not cover asset-only deployments, worker-first static routing rules, `_headers` restrictions on protocol headers, dynamic Worker generation limits, or celld's documented rejection of an outbound effect from a facet while a root storage transaction holds an uncommitted facet image. Facet persistence after eviction or restart belongs to the lifecycle suites. The open items stay unticked in the [roadmap](ROADMAP.md).

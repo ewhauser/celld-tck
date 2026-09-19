@@ -2,11 +2,12 @@
 
 [bugs.json](bugs.json) is the machine-readable registry used by the runner. Entries below are confirmed on celld **0.5.0**, reviewed September 18, 2026. Upstream reports remain local drafts.
 
-| ID       | Status | Bug                                                                       | Affected cases                                  |
-| -------- | ------ | ------------------------------------------------------------------------- | ----------------------------------------------- |
-| CELL-001 | Open   | [Repeated body reads and null-body state](upstream/body-consumption.md)   | `http.body-consumption`, `repro.body-readers`   |
-| CELL-002 | Open   | [Negative list limit error class](upstream/storage-list-validation.md)    | `storage.invalid-input`, `repro.storage-errors` |
-| CELL-003 | Open   | [Uncloneable storage value error class](upstream/storage-clone-errors.md) | `storage.invalid-input`, `repro.storage-errors` |
+| ID       | Status | Bug                                                                                    | Affected cases                                  |
+| -------- | ------ | -------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| CELL-001 | Open   | [Repeated body reads and null-body state](upstream/body-consumption.md)                | `http.body-consumption`, `repro.body-readers`   |
+| CELL-002 | Open   | [Negative list limit error class](upstream/storage-list-validation.md)                 | `storage.invalid-input`, `repro.storage-errors` |
+| CELL-003 | Open   | [Uncloneable storage value error class](upstream/storage-clone-errors.md)              | `storage.invalid-input`, `repro.storage-errors` |
+| CELL-004 | Open   | [Missing directory index for a trailing-slash path](upstream/asset-directory-index.md) | `assets.html-routing`                           |
 
 ## Run policy
 

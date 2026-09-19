@@ -29,6 +29,10 @@
     {
       "runId": "tck-082f810e-5fb7-477b-a9bd-f202de438ca7",
       "sourceRevision": "f9f2e538db459a5ef0270b25cd003037d42590cd"
+    },
+    {
+      "runId": "tck-0c9aa3ed-1709-4edd-9651-fb1b244bc9b8",
+      "sourceRevision": "b723207c722f30400994f13075d993216a9b91a7"
     }
   ],
   "cases": {
@@ -1739,37 +1743,37 @@
         "page": {
           "status": 200,
           "location": null,
-          "contentType": "text/html; charset=utf-8",
           "page": "html",
+          "contentType": "text/html; charset=utf-8",
           "body": "<!doctype html>\n<title>tck page</title>"
         },
         "pageHtml": {
           "status": 307,
           "location": "/page",
-          "contentType": null,
           "page": null,
-          "body": ""
+          "contentType": null,
+          "body": null
         },
         "folder": {
           "status": 307,
           "location": "/folder/",
-          "contentType": null,
           "page": null,
-          "body": ""
+          "contentType": null,
+          "body": null
         },
         "folderSlash": {
           "status": 200,
           "location": null,
-          "contentType": "text/html; charset=utf-8",
           "page": null,
+          "contentType": "text/html; charset=utf-8",
           "body": "<!doctype html>\n<title>tck folder index</title>"
         },
         "missing": {
           "status": 404,
           "location": null,
-          "contentType": null,
           "page": null,
-          "body": ""
+          "contentType": null,
+          "body": null
         }
       }
     },
@@ -1782,23 +1786,23 @@
         "permanent": {
           "status": 301,
           "location": "/page",
-          "contentType": null,
           "page": null,
-          "body": ""
+          "contentType": null,
+          "body": null
         },
         "temporary": {
           "status": 302,
           "location": "/page",
-          "contentType": null,
           "page": null,
-          "body": ""
+          "contentType": null,
+          "body": null
         },
         "unmatched": {
           "status": 404,
           "location": null,
-          "contentType": null,
           "page": null,
-          "body": ""
+          "contentType": null,
+          "body": null
         }
       }
     },

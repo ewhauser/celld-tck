@@ -26,6 +26,15 @@
       "owner": "celld-tck maintainers",
       "reviewedAt": "2026-09-18",
       "upstreamIssue": null
+    },
+    {
+      "id": "CELL-004",
+      "title": "Static assets do not serve a directory index for a trailing-slash path",
+      "status": "open",
+      "report": "upstream/asset-directory-index.md",
+      "owner": "celld-tck maintainers",
+      "reviewedAt": "2026-09-18",
+      "upstreamIssue": null
     }
   ],
   "expectations": [
@@ -42,8 +51,8 @@
         "body": {
           "before": false,
           "after": true,
-          "text": "\u03bb\ud83c\udf0d",
-          "cloned": "\u03bb\ud83c\udf0d",
+          "text": "λ🌍",
+          "cloned": "λ🌍",
           "twice": "accepted",
           "lateClone": "TypeError"
         }
@@ -247,6 +256,57 @@
           },
           "absent": true,
           "validLimit": []
+        }
+      },
+      "compatibilityDate": "2026-07-30",
+      "compatibilityFlags": []
+    },
+    {
+      "caseId": "assets.html-routing",
+      "bugIds": ["CELL-004"],
+      "celldVersion": "0.5.0",
+      "evidenceRun": "tck-61e8bd92-7c94-40b3-a868-a9fa40881eec",
+      "candidate": {
+        "status": 200,
+        "headers": {
+          "content-type": "application/json"
+        },
+        "body": {
+          "page": {
+            "status": 200,
+            "location": null,
+            "page": "html",
+            "contentType": "text/html; charset=utf-8",
+            "body": "<!doctype html>\n<title>tck page</title>"
+          },
+          "pageHtml": {
+            "status": 307,
+            "location": "/page",
+            "page": null,
+            "contentType": null,
+            "body": null
+          },
+          "folder": {
+            "status": 307,
+            "location": "/folder/",
+            "page": null,
+            "contentType": null,
+            "body": null
+          },
+          "folderSlash": {
+            "status": 404,
+            "location": null,
+            "page": null,
+            "contentType": null,
+            "body": null
+          },
+          "missing": {
+            "status": 404,
+            "location": null,
+            "page": null,
+            "contentType": null,
+            "body": null
+          }
         }
       },
       "compatibilityDate": "2026-07-30",
