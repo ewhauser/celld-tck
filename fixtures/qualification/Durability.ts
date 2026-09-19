@@ -47,6 +47,22 @@ export const durabilityOperation = (
       );
       return Response.json({ synced: true });
     }
+    // Leaves an explicit durability barrier outstanding for the driver's fault
+    // window. Observation only: the driver classifies the outcome.
+    if (path === "/durability/pending-sync") {
+      const started = Date.now();
+      yield* platform(() =>
+        storage.put("durable", "pending", { allowUnconfirmed: true }),
+      );
+      const error = yield* rejection(platform(() => storage.sync()));
+      return Response.json({
+        revision: "qualification-v1",
+        rejected: error !== "accepted",
+        outcome: error,
+        elapsedMs: Date.now() - started,
+        value: storage.kv.get("durable"),
+      });
+    }
     if (path === "/durability/sync") {
       yield* platform(() =>
         storage.put("durable", "after", { allowUnconfirmed: true }),
