@@ -10,6 +10,7 @@ export type ApiSuite =
   | "core"
   | "bindings"
   | "node"
+  | "flags"
   | "extensions"
   | "repros";
 export type MultinodeSuite = "multinode" | "fleet" | "resilience";
@@ -46,6 +47,7 @@ export const suiteRegistry: readonly SuiteEntry[] = [
   { name: "core", kind: "api" },
   { name: "bindings", kind: "api" },
   { name: "node", kind: "api" },
+  { name: "flags", kind: "api" },
   { name: "extensions", kind: "api" },
   { name: "repros", kind: "api" },
   { name: "recovery", kind: "recovery" },

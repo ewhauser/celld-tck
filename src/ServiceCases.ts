@@ -1,6 +1,7 @@
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { endpoint, poll } from "./CoreCases.js";
 import { call, define, response } from "./Cases.js";
+import { decodeAs } from "./Artifacts.js";
 import { equal } from "./Oracle.js";
 import type { TestCase } from "./Domain.js";
 const bindingCase = (
@@ -11,7 +12,7 @@ const bindingCase = (
 ) =>
   endpoint(id, path, expected, `https://developers.cloudflare.com/${family}/`);
 const workflowMode = (
-  mode: "retry" | "event",
+  mode: "retry" | "event" | "timeout",
   expected: unknown,
 ): TestCase => ({
   ...define(
@@ -37,9 +38,110 @@ const workflowMode = (
   ),
   contract: "https://developers.cloudflare.com/workflows/build/workers-api/",
 });
+const Stamp = Schema.Struct({
+  attempts: Schema.Int,
+  at: Schema.Int,
+  id: Schema.String,
+});
+/**
+ * An explicit `retry({ delaySeconds })` must postpone redelivery beyond the
+ * consumer's configured `retry_delay` of 0 and keep the message identity.
+ * Arrival times are runtime-specific, so the oracle bounds the interval instead
+ * of comparing the two observations for equality.
+ */
+const queueRetryDelay: TestCase = {
+  id: "queues.retry-delay",
+  contract:
+    "https://developers.cloudflare.com/queues/configuration/javascript-apis/",
+  run: (target, input) =>
+    Effect.gen(function* () {
+      yield* equal(
+        yield* call(target, input, "/queues/retry-delay"),
+        response({ sent: true }),
+      );
+      return yield* poll(
+        call(target, input, "/queues/state"),
+        (result) =>
+          typeof result.body === "object" &&
+          result.body !== null &&
+          "delayed:2" in result.body,
+      );
+    }),
+  check: (value) =>
+    Effect.gen(function* () {
+      const observation = yield* decodeAs(
+        Schema.Struct({
+          status: Schema.Literal(200),
+          headers: Schema.Record(Schema.String, Schema.String),
+          body: Schema.Struct({
+            "delayed:1": Stamp,
+            "delayed:2": Stamp,
+          }),
+        }),
+        "assertion",
+      )(value);
+      const first = observation.body["delayed:1"];
+      const second = observation.body["delayed:2"];
+      yield* equal([first.attempts, second.attempts], [1, 2]);
+      yield* equal(first.id, second.id);
+      yield* equal(first.id.length > 0, true);
+      const elapsed = second.at - first.at;
+      yield* equal(elapsed >= 2500 && elapsed < 60000, true);
+    }),
+  compare: () => Effect.void,
+};
 export const serviceCases: ReadonlyArray<TestCase> = [
   workflowMode("retry", { attempts: 2 }),
   workflowMode("event", { payload: { value: "λ" }, type: "continue" }),
+  workflowMode("timeout", { timedOut: "Error", after: 25 }),
+  queueRetryDelay,
+  bindingCase(
+    "kv.expiration",
+    "/kv/expiration",
+    {
+      value: "λ",
+      metadata: { tag: 1 },
+      names: ["/keep", "/ttl"],
+      keepExpiration: null,
+      expiringInWindow: true,
+      tooShort: "Error",
+    },
+    "kv",
+  ),
+  bindingCase(
+    "d1.exec-batch",
+    "/d1/exec-batch",
+    {
+      execCount: 2,
+      success: [true, true, true],
+      results: [[], [], [{ n: 1 }, { n: 2 }]],
+      changes: [1, 1, 0],
+    },
+    "d1",
+  ),
+  bindingCase(
+    "r2.list-options",
+    "/r2/list-options",
+    {
+      objects: ["/top"],
+      prefixes: ["/dir/"],
+      truncated: false,
+      nested: ["/dir/a", "/dir/b"],
+      nestedPrefixes: [],
+      // Without `include`, a listed object carries no stored metadata.
+      bare: { http: {}, custom: {} },
+      included: {
+        http: "text/plain; charset=utf-8",
+        custom: { label: "λ" },
+      },
+      written: {
+        type: "text/plain; charset=utf-8",
+        disposition: 'attachment; filename="λ.txt"',
+        cache: "max-age=42",
+      },
+    },
+    "r2",
+  ),
   bindingCase(
     "rpc.named-service",
     "/services/rpc",

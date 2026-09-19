@@ -2,6 +2,7 @@ import { DurableObject, RpcTarget, WorkerEntrypoint } from "cloudflare:workers";
 import { Effect, Schema } from "effect";
 
 import { services, consume } from "./Services.js";
+import { boundaries } from "./Boundaries.js";
 export { TestWorkflow } from "./Services.js";
 import { platform, operation, rejection } from "./Platform.js";
 import { web } from "./Web.js";
@@ -21,6 +22,7 @@ export class Service extends WorkerEntrypoint<Env> {
 
 export class Probe extends DurableObject<Env> {
   private initialized = false;
+  private openSockets = 0;
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     ctx.blockConcurrencyWhile(() =>
@@ -188,6 +190,32 @@ export class Probe extends DurableObject<Env> {
             retry: (yield* platform(() => storage.get("retry"))) ?? false,
             retryCount: (yield* platform(() => storage.get("retryCount"))) ?? 0,
           });
+        case "/websocket/echo": {
+          // Non-hibernatable peer for a Worker-initiated Upgrade: the object
+          // counts live sockets and owns every close it initiates.
+          const pair = new WebSocketPair();
+          const server = pair[1];
+          server.accept();
+          self.openSockets++;
+          server.addEventListener("message", (event) =>
+            Effect.runSync(
+              Effect.sync(() => {
+                if (event.data === "close") server.close(4001, "server λ");
+                else server.send(`echo:${String(event.data)}`);
+              }),
+            ),
+          );
+          server.addEventListener("close", () =>
+            Effect.runSync(
+              Effect.sync(() => {
+                self.openSockets--;
+              }),
+            ),
+          );
+          return new Response(null, { status: 101, webSocket: pair[0] });
+        }
+        case "/websocket/count":
+          return Response.json({ open: self.openSockets });
         case "/websocket": {
           const pair = new WebSocketPair();
           pair[1].serializeAttachment({ label: "durable", count: 7 });
@@ -339,6 +367,8 @@ export default {
           return new Response("Invalid object name", { status: 400 });
         const serviceResult = yield* services(request, env, name);
         if (serviceResult !== undefined) return Response.json(serviceResult);
+        const boundaryResult = yield* boundaries(request, env, name);
+        if (boundaryResult !== undefined) return Response.json(boundaryResult);
         const stub = env.PROBE.getByName(name);
         if (url.pathname === "/rpc/echo")
           return Response.json(

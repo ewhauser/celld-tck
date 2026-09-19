@@ -16,6 +16,17 @@ export const rejectionConfigs = [
     diagnostic: "does not support these config keys: vectorize",
   },
   {
+    // A compatibility switch and its disable counterpart cannot both be set.
+    id: "deployment.contradictory-flags",
+    patch: {
+      compatibility_flags: [
+        "delete_all_deletes_alarm",
+        "delete_all_preserves_alarm",
+      ],
+    },
+    diagnostic: "delete_all_preserves_alarm",
+  },
+  {
     id: "deployment.invalid-name",
     patch: { name: "INVALID_NAME" },
     diagnostic: "config `name` must contain",

@@ -18,6 +18,7 @@ export const buildFixtureFor = (
   fixture:
     | "core"
     | "node"
+    | "flags"
     | "extensions"
     | "repro"
     | "recovery"
@@ -32,13 +33,23 @@ export const buildFixtureFor = (
       FixtureConfig,
       yield* fs.readFileString(
         new URL(
-          `../fixtures/${fixture === "node" ? "core" : fixture}/wrangler.jsonc`,
+          `../fixtures/${fixture === "node" || fixture === "flags" ? "core" : fixture}/wrangler.jsonc`,
           import.meta.url,
         ).pathname,
       ),
     );
     if (fixture === "node")
       config = { ...config, compatibility_flags: ["nodejs_compat"] };
+    // The same core worker, rebuilt with the disable counterparts of two
+    // switches that are on by default at the pinned compatibility date.
+    if (fixture === "flags")
+      config = {
+        ...config,
+        compatibility_flags: [
+          "delete_all_preserves_alarm",
+          "no_websocket_standard_binary_type",
+        ],
+      };
     const binding = config.durable_objects.bindings[0];
     if (!binding)
       return yield* Effect.fail(
@@ -78,8 +89,10 @@ export const buildFixtureFor = (
       try: () =>
         build({
           entryPoints: [
-            new URL(`../fixtures/${fixture}/worker.ts`, import.meta.url)
-              .pathname,
+            new URL(
+              `../fixtures/${fixture === "flags" ? "core" : fixture}/worker.ts`,
+              import.meta.url,
+            ).pathname,
           ],
           outfile: resolve(directory, "worker.js"),
           bundle: true,

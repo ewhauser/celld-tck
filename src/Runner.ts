@@ -118,7 +118,13 @@ export const runSuite = (options: RunOptions) =>
       yield* Console.log(
         `Building Effect fixtures; profile=${options.profile}, seed=${options.seed}`,
       );
-      for (const fixture of ["core", "node", "extensions", "repro"] as const) {
+      for (const fixture of [
+        "core",
+        "node",
+        "flags",
+        "extensions",
+        "repro",
+      ] as const) {
         if (!selected.some((test) => (test.fixture ?? "core") === fixture))
           continue;
         yield* Effect.scoped(

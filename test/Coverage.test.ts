@@ -40,6 +40,17 @@ it.effect(
           (test) => test.fixture === "node",
         ),
       ).toBe(true);
+      // The flag variant suite must only select cases built with the variant's
+      // own compatibility flags; its sibling default case stays on core.
+      expect(
+        (yield* selectCases("", "flags")).map((test) => [
+          test.id,
+          test.fixture ?? "core",
+        ]),
+      ).toEqual([
+        ["flags.enabled-defaults", "core"],
+        ["flags.disabled-counterparts", "flags"],
+      ]);
     }),
 );
 it.effect("rejects lost updates even if the final counter is correct", () =>
