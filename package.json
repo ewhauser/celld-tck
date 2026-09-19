@@ -30,6 +30,7 @@
     "test:faults": "tsx src/main.ts --profile local --suite faults",
     "test:capacity": "tsx src/main.ts --profile local --suite capacity",
     "test:security": "tsx src/main.ts --profile local --suite security",
+    "test:telemetry": "tsx src/main.ts --profile local --suite telemetry",
     "site:build": "tsx src/site/main.ts"
   },
   "dependencies": {

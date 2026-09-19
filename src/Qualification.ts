@@ -4,7 +4,7 @@ import { Artifacts, artifactsLayer } from "./Artifacts.js";
 import { buildFixtureFor } from "./Build.js";
 import { Transport, TckError, type Profile } from "./Domain.js";
 import type { QualificationSuite } from "./Suites.js";
-import { acquireLocal } from "./Local.js";
+import { acquireLocal, type TelemetryMode } from "./Local.js";
 import { provenance } from "./Provenance.js";
 import { makeSuiteExecutor } from "./SuiteExecutor.js";
 import {
@@ -16,10 +16,12 @@ import { dependencyCases } from "./QualificationDependencies.js";
 import { faultCases } from "./QualificationFaults.js";
 import { capacityCases } from "./QualificationCapacity.js";
 import { securityCases } from "./QualificationSecurity.js";
+import { telemetryCases } from "./QualificationTelemetry.js";
 interface QualificationCase {
   readonly manualReload: boolean;
   readonly adoptionDeadline: boolean;
   readonly security: boolean;
+  readonly telemetry: TelemetryMode | undefined;
   readonly id: string;
   readonly durability: "bucket" | "fleet";
   readonly run: (
@@ -36,10 +38,12 @@ export const qualificationCases = [
   ...faultCases,
   ...capacityCases,
   ...securityCases,
+  ...telemetryCases,
 ].map((test) => ({
   manualReload: false,
   adoptionDeadline: false,
   security: false,
+  telemetry: undefined,
   durability: "fleet" as const,
   ...test,
 })) satisfies readonly QualificationCase[];
@@ -104,6 +108,7 @@ export const runQualification = (options: {
                 nodeCount: 3,
                 qualification: true,
                 security: scenario.security,
+                telemetry: scenario.telemetry,
                 manualReload: scenario.manualReload,
                 adoptionDeadline: scenario.adoptionDeadline,
               });
