@@ -1,0 +1,18 @@
+# Binary-upgrade overlay, layered after infra/operations.yaml.
+#
+# infra/compose.yaml pins one celld image for the whole fleet. This overlay
+# indirects each node's image through its own variable so one run can start a
+# fleet on an explicitly pinned older release and then replace one node at a
+# time with the pinned current release, which is what a rolling binary upgrade
+# is. The `tool` service is not indirected: the deployment is written once, by
+# the release the rest of the suite pins.
+#
+# Both defaults are the pinned v0.5.0 digest, so selecting this overlay without
+# setting the variables changes nothing.
+services:
+  celld:
+    image: "${TCK_IMAGE_CELLD:-ghcr.io/denoland/celld:v0.5.0@sha256:df8e74bb9a059df5779644368984933eba76acd6a2d196672732f4368f760fc8}"
+  celld2:
+    image: "${TCK_IMAGE_CELLD2:-ghcr.io/denoland/celld:v0.5.0@sha256:df8e74bb9a059df5779644368984933eba76acd6a2d196672732f4368f760fc8}"
+  celld3:
+    image: "${TCK_IMAGE_CELLD3:-ghcr.io/denoland/celld:v0.5.0@sha256:df8e74bb9a059df5779644368984933eba76acd6a2d196672732f4368f760fc8}"
