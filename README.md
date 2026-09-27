@@ -44,6 +44,8 @@ pnpm test:reference
 
 Both `docker compose` and `docker-compose` are supported. Set `TCK_COMPOSE_BIN` if Compose is installed elsewhere.
 
+MinIO's public container images are unavailable. Compose builds the same pinned MinIO server and client releases from official GitHub binaries using SHA-256 checksums and a digest-pinned Alpine base; see [the Dockerfile](infra/minio/Dockerfile). This requires BuildKit and supports amd64 and arm64. The first Docker run downloads the binaries; later runs reuse build layers.
+
 ## Reading the results
 
 The [live matrix](https://ewhauser.github.io/celld-tck/) updates from CI on `main`, including failing runs. It separates passes, known bugs, accepted divergences, failures, and missing evidence, with individual observations and report downloads.

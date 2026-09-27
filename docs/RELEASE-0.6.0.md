@@ -24,6 +24,12 @@ The initial API review is recorded in `tck-3b8dd9ff-6e2d-475c-a43b-46829979609f`
 
 These are local Docker, MinIO, and workerd checks. They do not qualify AWS, managed Cloudflare, or a fleet-durability binary upgrade.
 
+## CI provisioning repair
+
+The initial PR checks could not pull either pinned MinIO image from Quay (`401 Unauthorized`), before exercising celld. Cached images masked this locally. Compose now builds the same MinIO and mc releases from official GitHub release binaries, with an explicit SHA-256 checksum for each amd64/arm64 binary and a digest-pinned Alpine base. No runtime assertions or bug waivers change for this repair.
+
+Both architecture builds and their reported release versions were checked. `pnpm check` still passes all 574 tests. A fresh Compose project using the replacement images passed `facets.outbound-transaction` in `tck-013e0666-2b2a-473a-81e7-67606794d250`; setup also exercises conditional object-store writes.
+
 ## Release-specific coverage still to add
 
 The pin upgrade revalidates existing cases; it does not fully qualify every release-note claim. Targeted cases remain for:
