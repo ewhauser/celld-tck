@@ -56,15 +56,21 @@ export const buildFixtureFor = (
         new TckError({ phase: "build", message: "Missing fixture DO binding" }),
       );
     let dynamicCode = "";
-    // Both the extensions fixture and the recovery fixture load a child bundle
-    // through a Worker Loader binding; only the former ships static assets.
-    if (fixture === "extensions" || fixture === "recovery") {
+    // Extension and lifecycle fixtures load a child through Worker Loader.
+    // Qualification reuses the recovery ledger; only extensions ship assets.
+    if (
+      fixture === "extensions" ||
+      fixture === "recovery" ||
+      fixture === "qualification"
+    ) {
       const child = yield* Effect.tryPromise({
         try: () =>
           build({
             entryPoints: [
-              new URL(`../fixtures/${fixture}/child.ts`, import.meta.url)
-                .pathname,
+              new URL(
+                `../fixtures/${fixture === "qualification" ? "recovery" : fixture}/child.ts`,
+                import.meta.url,
+              ).pathname,
             ],
             bundle: true,
             write: false,

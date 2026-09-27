@@ -30,15 +30,28 @@ The initial PR checks could not pull either pinned MinIO image from Quay (`401 U
 
 Both architecture builds and their reported release versions were checked. `pnpm check` still passes all 574 tests. A fresh Compose project using the replacement images passed `facets.outbound-transaction` in `tck-013e0666-2b2a-473a-81e7-67606794d250`; setup also exercises conditional object-store writes.
 
-## Release-specific coverage still to add
+## Additional release coverage
 
-The pin upgrade revalidates existing cases; it does not fully qualify every release-note claim. Targeted cases remain for:
+Fifteen new differential cases exercise Ed25519/NODE-ED25519 with RFC 8032 vectors; X25519 raw keys, RFC 7748 derivation and low-order rejection; nested synchronous transactions, callback arity and rollback; invalid SQLite UTF-8; Unicode header construction and fetched response decoding; R2 key identity and list encoding; `ctx.exports` default/named fetch and facet classes; relative Dynamic Worker imports; WorkerCode rejection rules; wrapped WASM; root worker-first routing; alarm rearming with pending timers; close-frame `wasClean`; and outgoing WebSocket streaming during a running hibernatable handler.
 
-- Ed25519/NODE-ED25519 interoperability and X25519 raw-key import/export and low-order rejection.
-- `ctx.exports` entrypoint fetch and facet creation; first-open migration of a persisted v0.5.1 facet database.
-- New `WorkerCode` rejection rules, nested `transactionSync()` calls and callback arity, and relative imports inside Dynamic Worker subdirectories.
-- R2 empty path segments, non-ASCII and percent-encoded list keys, and the legacy trailing-slash key behavior.
-- Invalid SQLite UTF-8, Unicode header values, close-frame `wasClean`, the root `run_worker_first` route, re-armed alarms with pending timers, and WebSocket delivery during a running message handler.
-- Per-cell memory bounds and follower log-tail range evidence under recovery faults.
+The root routing fixture has an actual index asset and no catch-all worker-first rule, so `/` must work independently. The WebSocket case measures three frames on the public listener with one client's monotonic clock. Its handler sleeps 500 ms twice; the oracle requires at least 750 ms from first to last receipt and 250 ms from second to last. Correct payloads delivered in one batch fail. Raw receipt timestamps are saved. Each new case has an independently captured workerd observation and named semantic mutations, including rejection of matching wrong results.
 
-Each addition needs an independent positive observation and a named behavior-specific negative example as required by [AGENTS.md](../AGENTS.md). The outstanding feature coverage in [RELEASE-0.5.1.md](RELEASE-0.5.1.md) also remains open.
+Validation of these additions:
+
+- `pnpm check`: 635 tests across 37 files, plus formatting, lint and TypeScript.
+- `pnpm test:reference`: 110 passes in `tck-85100d73-461c-47eb-96af-af2ca7631c6a`.
+- `pnpm test:local`: 104 passes, three divergences and nine known-bug results in `tck-d8c0f5ab-dea6-482a-84d5-c2a809c1ab17`.
+- The final raw-timestamp WebSocket oracle was then validated against both runtimes in `tck-45a6130d-d82f-4327-9418-7559beda0a4f`. The independent corpus includes that final observation.
+
+The two new API findings are [CELL-009](upstream/x25519-low-order.md), a generic X25519 error class, and [CELL-010](upstream/r2-trailing-slash-list.md), omission of a readable trailing-slash object from R2 listing. Their exact observations are scoped to 0.6.0. They remain compatibility defects, not passes; strict `--known-bugs error` mode rejects them.
+
+`operations.persisted-upgrade` seeds facet SQL/KV, a root witness and an R2 trailing-slash key on the digest-pinned v0.5.1 release. A same-version restart first proves persistence. It stops the entire fleet before replacing it with v0.6.0, then requires first-open migration, new facet writes and another restart. The first-open facet check currently fails: the SQL table is missing after the upgrade although it survived the v0.5.1 restart. This failure is **not waived**, so the operations CI job is expected to fail. See the [migration investigation](upstream/facet-first-open-migration.md). The final run `tck-dcd162d9-d936-43f2-94f8-447d27e17b64` preserved the root witness and confirmed the legacy R2 identity, but rejected the missing facet table. The later write/restart assertions remain unexecuted when first-open fails.
+
+## Remaining release-specific gaps
+
+The publicly observable API additions above do not establish every implementation claim:
+
+- Per-cell memory bounds need a native allocation or statement-cache metric. Process RSS alone cannot prove the 128 KiB compiled-statement cap, shared object-store client ownership or absence of per-operation timer leaks. No arbitrary RSS threshold is treated as proof.
+- Follower range-evidence rejection needs a controlled failed, incomplete or legacy tail response after sealing. Existing fleet recovery tests prove acknowledged-write retention, but do not inject faults specifically between the seal response and the range-certified tail response. The v0.6.0 internal protocol distinguishes these stages; ordinary whole-node/network outages do not independently exercise the new guard.
+
+These require additional instrumentation or a targeted peer-protocol fault harness. AWS, managed Cloudflare, the outstanding feature coverage in [RELEASE-0.5.1.md](RELEASE-0.5.1.md), and other distributed schedules remain unqualified. All new evidence above is local workerd/Docker/MinIO evidence.

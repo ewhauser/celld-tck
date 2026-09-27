@@ -37,5 +37,6 @@
   "workflows": [
     { "binding": "FLOW", "name": "tck-flow", "class_name": "RecoveryWorkflow" },
   ],
+  "worker_loaders": [{ "binding": "LOADER" }],
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Recovery"] }],
 }
