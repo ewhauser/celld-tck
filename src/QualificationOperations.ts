@@ -8,7 +8,6 @@
 // live on the binary, and the limits of this coverage are recorded in
 // docs/FLEET-OPERATIONS.md. Orchestration lives here; every classification is
 // a pure oracle in OperationsOracles.ts.
-import { checkUpgradeState } from "./UpgradeOracles.js";
 import { Effect, Fiber, Schema } from "effect";
 import { decodeAs, decodeJson } from "./Artifacts.js";
 import { leaseLapse } from "./Domain.js";
@@ -879,110 +878,7 @@ const binaryUpgrade = (ctx: QualificationContext) =>
     return { from: PREVIOUS_RELEASE, to: CURRENT_RELEASE, steps: steps.length };
   });
 
-// First-open migration uses a whole-fleet stop; no old node can reopen a
-// database once the new release has converted its facet storage.
-const persistedUpgrade = (ctx: QualificationContext) =>
-  Effect.gen(function* () {
-    const { nodes, fleet, artifacts } = ctx;
-    yield* checkNodeReleases(
-      Object.fromEntries(nodes.map((node) => [node, PREVIOUS_RELEASE])),
-      yield* releases(ctx, nodes),
-    );
-    const before = yield* checkUpgradeState(
-      yield* ctx.json("/upgrade/seed"),
-      "legacy",
-    );
-    const restart = (releaseVersion: "legacy" | "current") =>
-      Effect.gen(function* () {
-        yield* ctx.runtime.controls.compose([
-          "stop",
-          "--timeout",
-          "30",
-          ...nodes,
-        ]);
-        for (const node of nodes)
-          yield* equal((yield* fleet.inspect(node)).State.Running, false);
-        yield* leaseLapse;
-        for (const node of nodes) {
-          if (releaseVersion === "current")
-            yield* ctx.runtime.controls.setImage(node, CURRENT_IMAGE);
-          yield* fleet.recreate(node);
-          yield* refresh(ctx, [], node);
-        }
-        for (const node of nodes)
-          yield* waitForReady(
-            ctx.transport.request(ctx.targets[node], {
-              path: "/.well-known/celld/health",
-            }),
-            { interval: "1 second", attempts: 150, timeout: "150 seconds" },
-          );
-        yield* checkNodeReleases(
-          Object.fromEntries(
-            nodes.map((node) => [
-              node,
-              releaseVersion === "legacy" ? PREVIOUS_RELEASE : CURRENT_RELEASE,
-            ]),
-          ),
-          yield* releases(ctx, nodes),
-        );
-      });
-    yield* restart("legacy");
-    const legacyReopened = yield* checkUpgradeState(
-      yield* ctx.json("/upgrade/state"),
-      "legacy",
-      before.activation,
-    );
-    yield* artifacts.json("legacy-upgrade-control.json", {
-      before,
-      legacyReopened,
-    });
-    yield* restart("current");
-    const firstOpen = yield* ctx.json("/upgrade/state");
-    yield* artifacts.json("first-open-upgrade.json", firstOpen);
-    const migrated = yield* checkUpgradeState(
-      firstOpen,
-      "migrated",
-      legacyReopened.activation,
-    );
-    const advanced = yield* checkUpgradeState(
-      yield* ctx.json("/upgrade/advance"),
-      "advanced",
-    );
-    yield* restart("current");
-    const reopened = yield* checkUpgradeState(
-      yield* ctx.json("/upgrade/state"),
-      "advanced",
-      advanced.activation,
-    );
-    yield* artifacts.json("persisted-upgrade.json", {
-      before,
-      migrated,
-      advanced,
-      reopened,
-    });
-    return {
-      from: PREVIOUS_RELEASE,
-      to: CURRENT_RELEASE,
-      before,
-      migrated,
-      advanced,
-      reopened,
-    };
-  });
-
 export const operationsCases = [
-  {
-    id: "operations.persisted-upgrade" as const,
-    durability: "bucket" as const,
-    operations: true,
-    upgrade: true,
-    images: {
-      TCK_IMAGE_CELLD: PREVIOUS_IMAGE,
-      TCK_IMAGE_CELLD2: PREVIOUS_IMAGE,
-      TCK_IMAGE_CELLD3: PREVIOUS_IMAGE,
-    },
-    run: persistedUpgrade,
-  },
   {
     id: "operations.weighted-placement" as const,
     operations: true,

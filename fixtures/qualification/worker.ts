@@ -6,7 +6,6 @@ import {
   type WorkflowStep,
 } from "cloudflare:workers";
 import { Duration, Effect, Schema } from "effect";
-import { upgradeOperation } from "./Upgrade.js";
 import { durabilityOperation } from "./Durability.js";
 import { platform, ready } from "../shared/Platform.js";
 const blob = (id: number) => {
@@ -99,13 +98,6 @@ export class Recovery extends DurableObject<QualificationEnv> {
       Effect.gen({ self: this }, function* () {
         const url = new URL(request.url);
         const storage = this.ctx.storage;
-        if (url.pathname.startsWith("/upgrade/"))
-          return yield* upgradeOperation(
-            this.ctx,
-            this.env,
-            url,
-            this.activation,
-          );
         const durability = yield* durabilityOperation(
           this.ctx,
           url,

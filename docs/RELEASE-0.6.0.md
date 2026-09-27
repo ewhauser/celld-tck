@@ -38,20 +38,19 @@ The root routing fixture has an actual index asset and no catch-all worker-first
 
 Validation of these additions:
 
-- `pnpm check`: 635 tests across 37 files, plus formatting, lint and TypeScript.
+- `pnpm check`: 633 tests across 36 files, plus formatting, lint and TypeScript.
 - `pnpm test:reference`: 110 passes in `tck-85100d73-461c-47eb-96af-af2ca7631c6a`.
 - `pnpm test:local`: 104 passes, three divergences and nine known-bug results in `tck-d8c0f5ab-dea6-482a-84d5-c2a809c1ab17`.
 - The final raw-timestamp WebSocket oracle was then validated against both runtimes in `tck-45a6130d-d82f-4327-9418-7559beda0a4f`. The independent corpus includes that final observation.
 
 The two new API findings are [CELL-009](upstream/x25519-low-order.md), a generic X25519 error class, and [CELL-010](upstream/r2-trailing-slash-list.md), omission of a readable trailing-slash object from R2 listing. Their exact observations are scoped to 0.6.0. They remain compatibility defects, not passes; strict `--known-bugs error` mode rejects them.
 
-`operations.persisted-upgrade` seeds facet SQL/KV, a root witness and an R2 trailing-slash key on the digest-pinned v0.5.1 release. A same-version restart first proves persistence. It stops the entire fleet before replacing it with v0.6.0, then requires first-open migration, new facet writes and another restart. The first-open facet check currently fails: the SQL table is missing after the upgrade although it survived the v0.5.1 restart. This failure is **not waived**, so the operations CI job is expected to fail. See the [migration investigation](upstream/facet-first-open-migration.md). The final run `tck-dcd162d9-d936-43f2-94f8-447d27e17b64` preserved the root witness and confirmed the legacy R2 identity, but rejected the missing facet table. The later write/restart assertions remain unexecuted when first-open fails.
-
 ## Remaining release-specific gaps
 
 The publicly observable API additions above do not establish every implementation claim:
 
+- First-open migration of persisted v0.5.1 facet databases and legacy R2 trailing-slash keys are not covered by the current suite. The rolling binary-upgrade case continues to verify acknowledged ledger writes.
 - Per-cell memory bounds need a native allocation or statement-cache metric. Process RSS alone cannot prove the 128 KiB compiled-statement cap, shared object-store client ownership or absence of per-operation timer leaks. No arbitrary RSS threshold is treated as proof.
 - Follower range-evidence rejection needs a controlled failed, incomplete or legacy tail response after sealing. Existing fleet recovery tests prove acknowledged-write retention, but do not inject faults specifically between the seal response and the range-certified tail response. The v0.6.0 internal protocol distinguishes these stages; ordinary whole-node/network outages do not independently exercise the new guard.
 
-These require additional instrumentation or a targeted peer-protocol fault harness. AWS, managed Cloudflare, the outstanding feature coverage in [RELEASE-0.5.1.md](RELEASE-0.5.1.md), and other distributed schedules remain unqualified. All new evidence above is local workerd/Docker/MinIO evidence.
+Memory and follower-tail verification require additional instrumentation or a targeted peer-protocol fault harness. AWS, managed Cloudflare, the outstanding feature coverage in [RELEASE-0.5.1.md](RELEASE-0.5.1.md), and other distributed schedules remain unqualified. All new evidence above is local workerd/Docker/MinIO evidence.

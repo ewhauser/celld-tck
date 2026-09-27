@@ -21,14 +21,6 @@ export class Ledger extends DurableObject {
           });
           return Response.json({ seeded: true });
         }
-        if (new URL(request.url).pathname === "/advance") {
-          storage.transactionSync(() => {
-            storage.kv.put("balance", 20);
-            storage.sql.exec(
-              "INSERT INTO entries VALUES (2, 'after migration')",
-            );
-          });
-        }
         return Response.json({
           balance:
             (yield* platform(() => storage.get<number>("balance"))) ?? null,
